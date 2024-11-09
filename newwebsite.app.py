@@ -2,6 +2,7 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import plotly.graph_objects as go
+from datetime import datetime
 
 # Setting the page layout
 st.set_page_config(layout="centered", page_title="Golden Cross Analysis")
@@ -50,9 +51,15 @@ if st.button("Analyze"):
     golden_cross = (data['Short_MA'] > data['Long_MA']) & (data['Short_MA'].shift(1) <= data['Long_MA'].shift(1))
     golden_cross_dates = data[golden_cross].index
 
-    # Convert dates to strings to avoid Plotly issues
+    # Ensure dates are in datetime format before adding to Plotly
+    golden_cross_dates = pd.to_datetime(golden_cross_dates)
+
+    # Debugging output to verify date format
+    st.write("Golden Cross Dates (for debugging):", golden_cross_dates)
+
+    # Adding vertical lines for Golden Cross dates
     for date in golden_cross_dates:
-        fig.add_vline(x=date.strftime('%Y-%m-%d'), line=dict(color="green", width=1), annotation_text="Golden Cross", annotation_position="top")
+        fig.add_vline(x=date, line=dict(color="green", width=1), annotation_text="Golden Cross", annotation_position="top")
 
     # Update layout for better visualization
     fig.update_layout(
