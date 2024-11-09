@@ -49,8 +49,10 @@ if st.button("Analyze"):
     # Highlighting Golden Cross events
     golden_cross = (data['Short_MA'] > data['Long_MA']) & (data['Short_MA'].shift(1) <= data['Long_MA'].shift(1))
     golden_cross_dates = data[golden_cross].index
+
+    # Convert dates to strings to avoid Plotly issues
     for date in golden_cross_dates:
-        fig.add_vline(x=date, line=dict(color="green", width=1), annotation_text="Golden Cross", annotation_position="top")
+        fig.add_vline(x=date.strftime('%Y-%m-%d'), line=dict(color="green", width=1), annotation_text="Golden Cross", annotation_position="top")
 
     # Update layout for better visualization
     fig.update_layout(
