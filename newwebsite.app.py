@@ -51,15 +51,15 @@ if st.button("Analyze"):
     golden_cross = (data['Short_MA'] > data['Long_MA']) & (data['Short_MA'].shift(1) <= data['Long_MA'].shift(1))
     golden_cross_dates = data[golden_cross].index
 
-    # Ensure dates are in datetime format before adding to Plotly
+    # Ensure dates are in datetime format and debug
     golden_cross_dates = pd.to_datetime(golden_cross_dates)
-
-    # Debugging output to verify date format
     st.write("Golden Cross Dates (for debugging):", golden_cross_dates)
 
     # Adding vertical lines for Golden Cross dates
     for date in golden_cross_dates:
-        fig.add_vline(x=date, line=dict(color="green", width=1), annotation_text="Golden Cross", annotation_position="top")
+        # Convert date to string format if necessary to avoid datetime issues
+        date_str = date.strftime('%Y-%m-%d')
+        fig.add_vline(x=date_str, line=dict(color="green", width=1), annotation_text="Golden Cross", annotation_position="top")
 
     # Update layout for better visualization
     fig.update_layout(
