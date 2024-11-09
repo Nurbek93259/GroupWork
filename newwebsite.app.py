@@ -1,201 +1,68 @@
-import streamlit as st
 import pandas as pd
-import yfinance as yf
-from ta.volatility import BollingerBands
-from ta.trend import MACD, EMAIndicator, SMAIndicator, WMAIndicator
-from ta.momentum import RSIIndicator
-import datetime
-from sklearn.preprocessing import StandardScaler
+import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression, LogisticRegression
-from sklearn.neighbors import KNeighborsRegressor
-from xgboost import XGBRegressor
-from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor, GradientBoostingRegressor
-from sklearn.svm import SVR
-from sklearn.tree import DecisionTreeRegressor
-import lightgbm as lgb
-from catboost import CatBoostRegressor
-from sklearn.metrics import r2_score, mean_absolute_error
-import plotly.graph_objects as go
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report
+import matplotlib.pyplot as plt
 
-# Set up the titles in Streamlit Application
-st.title('Welcome to the Stock Technical Analysis Application')
-st.sidebar.info("This website was created and designed by [IUJ Group]")
-st.sidebar.info('Please fill the cells below:')
+# Load stock price data (assuming it's available as a CSV)
+# data = pd.read_csv("stock_data.csv")
 
-# Create main function in main interface with 3 categories "Visualize", "Recent Data" and "Predict"
-def main():
-    option = st.sidebar.selectbox('Make a choice', ['Visualize', 'Recent Data', 'Predict'])
-    if option == 'Visualize':
-        tech_indicators()
-    elif option == 'Recent Data':
-        dataframe()
-    else:
-        predict()
+# Sample data for demonstration (comment out if loading actual data)
+np.random.seed(0)
+dates = pd.date_range("2022-01-01", periods=500)
+prices = np.cumsum(np.random.randn(500)) + 100  # simulated prices
+data = pd.DataFrame({"Date": dates, "Close": prices})
 
-# Set up data downloading function from Yahoo Finance
-def download_data(op, start_date, end_date):
-    df = yf.download(op, start=start_date, end=end_date, progress=False)
-    return df
+# Step 1: Calculate Moving Averages
+data["50_MA"] = data["Close"].rolling(window=50).mean()
+data["200_MA"] = data["Close"].rolling(window=200).mean()
 
-# Set up input information from users
-option = st.sidebar.text_input('Enter a Stock Symbol', value='AAPL')
-option = option.upper()
-today = datetime.date.today()
-duration = st.sidebar.number_input('Enter the duration', value=3000)
-before = today - datetime.timedelta(days=duration)
-start_date = st.sidebar.date_input('Start Date', value=before)
-end_date = st.sidebar.date_input('End date', today)
-if st.sidebar.button('Send'):
-    if start_date < end_date:
-        st.sidebar.success('Start date: `%s`\n\nEnd date: `%s`' % (start_date, end_date))
-        data = download_data(option, start_date, end_date)
-    else:
-        st.sidebar.error('Error: End date must fall after start date')
+# Step 2: Identify Golden Crosses
+data["Golden_Cross"] = ((data["50_MA"].shift(1) < data["200_MA"].shift(1)) &
+                        (data["50_MA"] >= data["200_MA"])).astype(int)
 
-data = download_data(option, start_date, end_date)
-scaler = StandardScaler()
+# Step 3: Feature Engineering
+data["MA_Diff"] = data["50_MA"] - data["200_MA"]
+data["Momentum"] = data["Close"].pct_change(periods=5)
 
-def tech_indicators():
-    st.header('Technical Indicators')
-    indicators = st.multiselect('Choose Technical Indicators to Visualize', ['Close Price', 'Volume','Bollinger Bands', 'Moving Average Convergence Divergence', 'Relative Strength Indicator', 'Simple Moving Average (SMA)', 'Exponential Moving Average (EMA)', 'Weighted Moving Average (WMA)', 'Moving Average (MA)'])
+# Drop rows with NaN values from moving averages
+data.dropna(inplace=True)
 
-    fig = go.Figure()
+# Step 4: Prepare Data for Modeling
+X = data[["50_MA", "200_MA", "MA_Diff", "Momentum"]]
+y = data["Golden_Cross"]
 
-    # Plot Close Price
-    if 'Close Price' in indicators:
-        fig.add_trace(go.Scatter(x=data.index, y=data['Close'], mode='lines', name='Close Price'))
+# Train-Test Split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-    # Plot SMA
-    if 'Simple Moving Average (SMA)' in indicators:
-        sma_windows = st.text_input('Enter SMA windows (comma-separated):', '50,200')
-        for window in map(int, sma_windows.split(',')):
-            data[f'sma_{window}'] = SMAIndicator(data.Close, window=window).sma_indicator()
-            fig.add_trace(go.Scatter(x=data.index, y=data[f'sma_{window}'], mode='lines', name=f'SMA {window}'))
+# Step 5: Model Training
+model = RandomForestClassifier(random_state=42)
+model.fit(X_train, y_train)
 
-    # Plot EMA
-    if 'Exponential Moving Average (EMA)' in indicators:
-        ema_windows = st.text_input('Enter EMA windows (comma-separated):', '50,200')
-        for window in map(int, ema_windows.split(',')):
-            data[f'ema_{window}'] = EMAIndicator(data.Close, window=window).ema_indicator()
-            fig.add_trace(go.Scatter(x=data.index, y=data[f'ema_{window}'], mode='lines', name=f'EMA {window}'))
+# Model Evaluation
+y_pred = model.predict(X_test)
+print(classification_report(y_test, y_pred))
 
-    # Plot WMA
-    if 'Weighted Moving Average (WMA)' in indicators:
-        wma_windows = st.text_input('Enter WMA windows (comma-separated):', '50,200')
-        for window in map(int, wma_windows.split(',')):
-            data[f'wma_{window}'] = WMAIndicator(data.Close, window=window).wma()
-            fig.add_trace(go.Scatter(x=data.index, y=data[f'wma_{window}'], mode='lines', name=f'WMA {window}'))
+# Step 6: Visualization of Predictions and Golden Crosses
+data["Pred_Golden_Cross"] = model.predict(X)  # Predict on the full dataset for visualization
 
-    # Plot MA
-    if 'Moving Average (MA)' in indicators:
-        ma_windows = st.text_input('Enter MA windows (comma-separated):', '50,200')
-        for window in map(int, ma_windows.split(',')):
-            data[f'ma_{window}'] = data['Close'].rolling(window=window).mean()
-            fig.add_trace(go.Scatter(x=data.index, y=data[f'ma_{window}'], mode='lines', name=f'MA {window}'))
+# Plotting the Golden Cross Predictions
+plt.figure(figsize=(14, 7))
+plt.plot(data["Date"], data["Close"], label="Close Price")
+plt.plot(data["Date"], data["50_MA"], label="50-Day MA", linestyle="--")
+plt.plot(data["Date"], data["200_MA"], label="200-Day MA", linestyle="--")
 
-    st.plotly_chart(fig)
+# Highlight actual Golden Crosses
+golden_crosses = data[data["Golden_Cross"] == 1]
+plt.scatter(golden_crosses["Date"], golden_crosses["Close"], color="green", label="Actual Golden Cross", s=50)
 
-    # Plot Volume in a separate chart
-    if 'Volume' in indicators:
-        st.write('Volume')
-        fig_vol = go.Figure()
-        fig_vol.add_trace(go.Scatter(x=data.index, y=data['Volume'], mode='lines', name='Volume'))
-        st.plotly_chart(fig_vol)
+# Highlight predicted Golden Crosses
+predicted_crosses = data[data["Pred_Golden_Cross"] == 1]
+plt.scatter(predicted_crosses["Date"], predicted_crosses["Close"], color="orange", label="Predicted Golden Cross", s=50, marker='x')
 
-    # Plot Bollinger Bands in a separate chart
-    if 'Bollinger Bands' in indicators:
-        st.write('Bollinger Bands')
-        bb_indicator = BollingerBands(data.Close)
-        data['bb_h'] = bb_indicator.bollinger_hband()
-        data['bb_l'] = bb_indicator.bollinger_lband()
-        fig_bb = go.Figure()
-        fig_bb.add_trace(go.Scatter(x=data.index, y=data['Close'], mode='lines', name='Close Price'))
-        fig_bb.add_trace(go.Scatter(x=data.index, y=data['bb_h'], mode='lines', name='BB High'))
-        fig_bb.add_trace(go.Scatter(x=data.index, y=data['bb_l'], mode='lines', name='BB Low'))
-        st.plotly_chart(fig_bb)
-
-    # Plot MACD in a separate chart
-    if 'Moving Average Convergence Divergence' in indicators:
-        st.write('Moving Average Convergence Divergence')
-        data['macd'] = MACD(data.Close).macd()
-        fig_macd = go.Figure()
-        fig_macd.add_trace(go.Scatter(x=data.index, y=data['macd'], mode='lines', name='MACD'))
-        st.plotly_chart(fig_macd)
-
-    # Plot RSI in a separate chart
-    if 'Relative Strength Indicator' in indicators:
-        st.write('Relative Strength Indicator')
-        data['rsi'] = RSIIndicator(data.Close).rsi()
-        fig_rsi = go.Figure()
-        fig_rsi.add_trace(go.Scatter(x=data.index, y=data['rsi'], mode='lines', name='RSI'))
-        st.plotly_chart(fig_rsi)
-
-# Showing recent data:
-def dataframe():
-    st.header('Recent Data')
-    num_days = st.number_input('Enter number of days to display', min_value=1, value=20)
-    st.dataframe(data.tail(num_days))
-
-# Function to train and evaluate models
-def model_engine(model, num):
-    df = data[['Close']]
-    df['preds'] = data.Close.shift(-num)
-    x = df.drop(['preds'], axis=1).values
-    x = scaler.fit_transform(x)
-    x_forecast = x[-num:]
-    x = x[:-num]
-    y = df.preds.values
-    y = y[:-num]
-
-    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=.2, random_state=10)
-    model.fit(x_train, y_train)
-    preds = model.predict(x_test)
-    st.text(f'r2_score: {r2_score(y_test, preds)} \nMAE: {mean_absolute_error(y_test, preds)}')
-
-    forecast_pred = model.predict(x_forecast)
-    day = 1
-    predictions = []
-    for i in forecast_pred:
-        predictions.append(i)
-        day += 1
-
-    forecast_dates = pd.date_range(start=data.index[-1], periods=num + 1, freq='B')[1:]
-    predicted_data = pd.DataFrame({'Date': forecast_dates, 'Predicted Price': predictions})
-
-    return predicted_data
-
-# Creating interface for choosing learning model, prediction days, etc.
-def predict():
-    model_name = st.radio('Choose a model', ['LinearRegression', 'RandomForestRegressor', 'ExtraTreesRegressor', 'KNeighborsRegressor', 'XGBoostRegressor', 'SVR', 'DecisionTreeRegressor', 'GradientBoostingRegressor', 'LightGBM', 'CatBoost'])
-    num = st.number_input('How many days do you want to forecast?', value=10)
-    num = int(num)
-    if st.button('Predict'):
-        if model_name == 'LinearRegression':
-            engine = LinearRegression()
-        elif model_name == 'RandomForestRegressor':
-            engine = RandomForestRegressor()
-        elif model_name == 'ExtraTreesRegressor':
-            engine = ExtraTreesRegressor()
-        elif model_name == 'KNeighborsRegressor':
-            engine = KNeighborsRegressor()
-        elif model_name == 'XGBoostRegressor':
-            engine = XGBRegressor()
-        elif model_name == 'SVR':
-            engine = SVR()
-        elif model_name == 'DecisionTreeRegressor':
-            engine = DecisionTreeRegressor()
-        elif model_name == 'GradientBoostingRegressor':
-            engine = GradientBoostingRegressor()
-        elif model_name == 'LightGBM':
-            engine = lgb.LGBMRegressor()
-        elif model_name == 'CatBoost':
-            engine = CatBoostRegressor(verbose=0)
-
-        predicted_data = model_engine(engine, num)
-
-        st.header('Predicted Stock Prices')
-        st.line_chart(predicted_data.set_index('Date'))
-
-if __name__ == '__main__':
-    main()
+plt.legend()
+plt.title("Golden Cross Prediction Model")
+plt.xlabel("Date")
+plt.ylabel("Price")
+plt.show()
