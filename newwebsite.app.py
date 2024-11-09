@@ -33,7 +33,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Helper functions for technical indicators
-def calculate_sma(data, period):
+def calculate_sma(data, period=50):
     return data['Close'].rolling(window=period).mean()
 
 def calculate_rsi(data, period=20):
@@ -48,9 +48,15 @@ def calculate_macd(data):
     ema_26 = data['Close'].ewm(span=26, adjust=False).mean()
     return ema_12 - ema_26
 
-# Caching stock data fetching
+# Load full historical data for moving average calculation
 @st.cache_data
-def load_stock_data(ticker, start_date, end_date):
+def load_full_stock_data(ticker):
+    stock = yf.Ticker(ticker)
+    return stock.history(period="max")  # Fetch the maximum available historical data
+
+# Load stock data for a specific date range
+@st.cache_data
+def load_stock_data_in_date_range(ticker, start_date, end_date):
     stock = yf.Ticker(ticker)
     return stock.history(start=start_date, end=end_date)
 
@@ -83,12 +89,24 @@ def main():
     short_ma_days = st.sidebar.slider("Short-term moving average days:", 10, 100, 10)
     long_ma_days = st.sidebar.slider("Long-term moving average days:", 50, 200, 50)
     
-    # Date range for fetching data
+    # Date range for displaying data
     start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2021-01-01"))
     end_date = st.sidebar.date_input("End Date", pd.to_datetime("today"))
 
-    # Load stock data and company info
-    stock_data = load_stock_data(ticker, start_date, end_date)
+    # Load full historical data for moving average calculations
+    full_stock_data = load_full_stock_data(ticker)
+    
+    # Calculate moving averages on full historical data
+    full_stock_data['SMA_Short'] = calculate_sma(full_stock_data, short_ma_days)
+    full_stock_data['SMA_Long'] = calculate_sma(full_stock_data, long_ma_days)
+    full_stock_data['RSI'] = calculate_rsi(full_stock_data, 20)
+    full_stock_data['MACD'] = calculate_macd(full_stock_data)
+
+    # Filter data to the selected date range
+    stock_data = full_stock_data[(full_stock_data.index >= pd.to_datetime(start_date)) & 
+                                 (full_stock_data.index <= pd.to_datetime(end_date))]
+
+    # Load company info
     company_info = get_company_info(ticker)
     
     # 1. Company Information
@@ -121,15 +139,6 @@ def main():
     
     # 3. Technical Analysis
     st.header("Technical Analysis")
-    
-    # Calculate custom SMA, RSI, MACD based on user input
-    stock_data['SMA_Short'] = calculate_sma(stock_data, short_ma_days)
-    stock_data['SMA_Long'] = calculate_sma(stock_data, long_ma_days)
-    stock_data['RSI'] = calculate_rsi(stock_data, 20)
-    stock_data['MACD'] = calculate_macd(stock_data)
-    
-    # Drop rows with NaN values (which appear due to moving average calculation)
-    stock_data = stock_data.dropna(subset=['SMA_Short', 'SMA_Long', 'RSI', 'MACD'])
     
     # Plotting with Plotly
     fig = go.Figure()
@@ -165,4 +174,8 @@ def main():
     target = stock_data['Target']
     
     X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.2, random_state=42)
-   
+    model = train_model(X_train, y_train)
+    accuracy = model.score(X_test, y_test)
+    
+    st.write(f"Prediction Model Accuracy: {accuracy:.2%}")
+    st.write("Use the model pr
