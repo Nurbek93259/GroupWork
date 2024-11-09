@@ -1,68 +1,69 @@
+import streamlit as st
+import yfinance as yf
 import pandas as pd
-import numpy as np
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 
-# Load stock price data (assuming it's available as a CSV)
-# data = pd.read_csv("stock_data.csv")
+# Setting the page layout
+st.set_page_config(layout="centered", page_title="Golden Cross Analysis")
 
-# Sample data for demonstration (comment out if loading actual data)
-np.random.seed(0)
-dates = pd.date_range("2022-01-01", periods=500)
-prices = np.cumsum(np.random.randn(500)) + 100  # simulated prices
-data = pd.DataFrame({"Date": dates, "Close": prices})
+# Sidebar inputs
+st.sidebar.header("Input")
 
-# Step 1: Calculate Moving Averages
-data["50_MA"] = data["Close"].rolling(window=50).mean()
-data["200_MA"] = data["Close"].rolling(window=200).mean()
+# Input for stock symbol
+stock_symbol = st.sidebar.text_input("Stock symbol:", "NVDA")
 
-# Step 2: Identify Golden Crosses
-data["Golden_Cross"] = ((data["50_MA"].shift(1) < data["200_MA"].shift(1)) &
-                        (data["50_MA"] >= data["200_MA"])).astype(int)
+# Sliders for moving average periods
+short_ma = st.sidebar.slider("Short-term moving average days:", min_value=10, max_value=100, value=10)
+long_ma = st.sidebar.slider("Long-term moving average days:", min_value=50, max_value=200, value=50)
 
-# Step 3: Feature Engineering
-data["MA_Diff"] = data["50_MA"] - data["200_MA"]
-data["Momentum"] = data["Close"].pct_change(periods=5)
+# Date inputs
+start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2021-01-01"))
+end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("today"))
 
-# Drop rows with NaN values from moving averages
-data.dropna(inplace=True)
+# Fetching and processing data
+if st.button("Analyze"):
+    # Download stock data
+    data = yf.download(stock_symbol, start=start_date, end=end_date)
 
-# Step 4: Prepare Data for Modeling
-X = data[["50_MA", "200_MA", "MA_Diff", "Momentum"]]
-y = data["Golden_Cross"]
+    # Calculate moving averages
+    data["Short_MA"] = data["Close"].rolling(window=short_ma).mean()
+    data["Long_MA"] = data["Close"].rolling(window=long_ma).mean()
 
-# Train-Test Split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+    # Plotting with candlesticks
+    fig = go.Figure()
 
-# Step 5: Model Training
-model = RandomForestClassifier(random_state=42)
-model.fit(X_train, y_train)
+    # Candlestick trace for stock price
+    fig.add_trace(go.Candlestick(
+        x=data.index,
+        open=data['Open'],
+        high=data['High'],
+        low=data['Low'],
+        close=data['Close'],
+        name="Candlestick"
+    ))
 
-# Model Evaluation
-y_pred = model.predict(X_test)
-print(classification_report(y_test, y_pred))
+    # Adding moving averages to the plot
+    fig.add_trace(go.Scatter(x=data.index, y=data['Short_MA'], mode='lines', name=f'{short_ma}-Day MA', line=dict(width=1.5)))
+    fig.add_trace(go.Scatter(x=data.index, y=data['Long_MA'], mode='lines', name=f'{long_ma}-Day MA', line=dict(width=1.5)))
 
-# Step 6: Visualization of Predictions and Golden Crosses
-data["Pred_Golden_Cross"] = model.predict(X)  # Predict on the full dataset for visualization
+    # Highlighting Golden Cross events
+    golden_cross = (data['Short_MA'] > data['Long_MA']) & (data['Short_MA'].shift(1) <= data['Long_MA'].shift(1))
+    golden_cross_dates = data[golden_cross].index
+    for date in golden_cross_dates:
+        fig.add_vline(x=date, line=dict(color="green", width=1), annotation_text="Golden Cross", annotation_position="top")
 
-# Plotting the Golden Cross Predictions
-plt.figure(figsize=(14, 7))
-plt.plot(data["Date"], data["Close"], label="Close Price")
-plt.plot(data["Date"], data["50_MA"], label="50-Day MA", linestyle="--")
-plt.plot(data["Date"], data["200_MA"], label="200-Day MA", linestyle="--")
+    # Update layout for better visualization
+    fig.update_layout(
+        title=f"{stock_symbol} Price with {short_ma}-Day and {long_ma}-Day Moving Averages",
+        xaxis_title="Date",
+        yaxis_title="Price",
+        xaxis_rangeslider_visible=False,  # Hide the rangeslider to focus on the chart
+        template="plotly_dark"
+    )
 
-# Highlight actual Golden Crosses
-golden_crosses = data[data["Golden_Cross"] == 1]
-plt.scatter(golden_crosses["Date"], golden_crosses["Close"], color="green", label="Actual Golden Cross", s=50)
+    # Display plot
+    st.plotly_chart(fig, use_container_width=True)
 
-# Highlight predicted Golden Crosses
-predicted_crosses = data[data["Pred_Golden_Cross"] == 1]
-plt.scatter(predicted_crosses["Date"], predicted_crosses["Close"], color="orange", label="Predicted Golden Cross", s=50, marker='x')
-
-plt.legend()
-plt.title("Golden Cross Prediction Model")
-plt.xlabel("Date")
-plt.ylabel("Price")
-plt.show()
+    # Display data table (optional)
+    st.subheader("Data with Moving Averages")
+    st.write(data[["Open", "High", "Low", "Close", "Short_MA", "Long_MA"]].dropna())
