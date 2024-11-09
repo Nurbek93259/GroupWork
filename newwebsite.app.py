@@ -162,12 +162,16 @@ def main():
     features = stock_data[feature_columns]
     target = stock_data['Target']
     
-    X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.2, random_state=42)
-    model = train_model(X_train, y_train)
-    accuracy = model.score(X_test, y_test)
-    
-    st.write(f"Prediction Model Accuracy: {accuracy:.2%}")
-    st.write("Use the model predictions for additional insights into stock behavior.")
+    # Check if there is enough data for train_test_split
+    if len(features) < 5:  # Adjust threshold based on minimum requirement for train_test_split
+        st.write("Not enough data available for prediction within the selected date range and indicator settings.")
+    else:
+        X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.2, random_state=42)
+        model = train_model(X_train, y_train)
+        accuracy = model.score(X_test, y_test)
+        
+        st.write(f"Prediction Model Accuracy: {accuracy:.2%}")
+        st.write("Use the model predictions for additional insights into stock behavior.")
 
 if __name__ == "__main__":
     main()
