@@ -1,9 +1,4 @@
 streamlit
 pandas
 yfinance
-ta
-scikit-learn
-xgboost
-lightgbm
-catboost
 plotly
