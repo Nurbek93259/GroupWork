@@ -3,7 +3,6 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
-import wikipediaapi
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 
@@ -34,7 +33,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Helper functions for technical indicators
-def calculate_sma(data, period=50):
+def calculate_sma(data, period):
     return data['Close'].rolling(window=period).mean()
 
 def calculate_rsi(data, period=20):
@@ -49,7 +48,7 @@ def calculate_macd(data):
     ema_26 = data['Close'].ewm(span=26, adjust=False).mean()
     return ema_12 - ema_26
 
-# Caching stock data fetching for 5 years
+# Caching stock data fetching
 @st.cache_data
 def load_stock_data(ticker, start_date, end_date):
     stock = yf.Ticker(ticker)
@@ -129,6 +128,9 @@ def main():
     stock_data['RSI'] = calculate_rsi(stock_data, 20)
     stock_data['MACD'] = calculate_macd(stock_data)
     
+    # Drop rows with NaN values (which appear due to moving average calculation)
+    stock_data = stock_data.dropna(subset=['SMA_Short', 'SMA_Long', 'RSI', 'MACD'])
+    
     # Plotting with Plotly
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=stock_data.index, y=stock_data['Close'], mode='lines', name="Close Price"))
@@ -163,11 +165,4 @@ def main():
     target = stock_data['Target']
     
     X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.2, random_state=42)
-    model = train_model(X_train, y_train)
-    accuracy = model.score(X_test, y_test)
-    
-    st.write(f"Prediction Model Accuracy: {accuracy:.2%}")
-    st.write("Use the model predictions for additional insights into stock behavior.")
-
-if __name__ == "__main__":
-    main()
+   
