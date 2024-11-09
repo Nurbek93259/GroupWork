@@ -178,4 +178,7 @@ def main():
     accuracy = model.score(X_test, y_test)
     
     st.write(f"Prediction Model Accuracy: {accuracy:.2%}")
-    st.write("Use the model pr
+    st.write("Use the model predictions for additional insights into stock behavior.")
+
+if __name__ == "__main__":
+    main()
