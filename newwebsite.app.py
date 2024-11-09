@@ -6,7 +6,7 @@ import plotly.graph_objs as go
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 
-# Set page configuration (must be first Streamlit command)
+# Set page configuration (must be the first Streamlit command)
 st.set_page_config(page_title="Stock Analysis Dashboard", layout="wide", initial_sidebar_state="expanded")
 
 # Minimalist black theme styling
@@ -32,4 +32,105 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Continue with the rest of your code
+# Helper functions for technical indicators
+def calculate_sma(data, period=50):
+    return data['Close'].rolling(window=period).mean()
+
+def calculate_rsi(data, period=20):
+    delta = data['Close'].diff(1)
+    gain = delta.where(delta > 0, 0).rolling(window=period).mean()
+    loss = -delta.where(delta < 0, 0).rolling(window=period).mean()
+    rs = gain / loss
+    return 100 - (100 / (1 + rs))
+
+def calculate_macd(data):
+    ema_12 = data['Close'].ewm(span=12, adjust=False).mean()
+    ema_26 = data['Close'].ewm(span=26, adjust=False).mean()
+    return ema_12 - ema_26
+
+# Caching stock data fetching
+@st.cache_data
+def load_stock_data(ticker):
+    stock = yf.Ticker(ticker)
+    return stock.history(period="1y")  # Temporarily reduce period to 1 year for faster loading
+
+# Caching company information fetching
+@st.cache_data
+def get_company_info(stock):
+    return {
+        "Sector": stock.info.get("sector", "N/A"),
+        "Country": stock.info.get("country", "N/A"),
+        "CEO": stock.info.get("ceo", "N/A"),
+        "PE Ratio": stock.info.get("trailingPE", "N/A"),
+        "Price to Cashflow": stock.info.get("priceToCashflow", "N/A"),
+        "PB Ratio": stock.info.get("priceToBook", "N/A"),
+        "EPS": stock.info.get("trailingEps", "N/A"),
+    }
+
+# Caching model training
+@st.cache_resource
+def train_model(X_train, y_train):
+    model = RandomForestClassifier(n_estimators=10)  # Reduced number of estimators for faster training
+    model.fit(X_train, y_train)
+    return model
+
+# Main function
+def main():
+    # Sidebar for ticker input
+    ticker = st.sidebar.text_input("Enter Stock Ticker", "AAPL")
+    
+    # Load stock data and company info
+    stock_data = load_stock_data(ticker)
+    stock = yf.Ticker(ticker)
+    company_info = get_company_info(stock)
+    
+    # 1. Company Information
+    st.header("Company Information")
+    st.write("### Basic Info")
+    st.write(company_info)
+    
+    # 2. Fundamental Analysis
+    st.header("Fundamental Analysis")
+    st.write(f"**P/E Ratio:** {company_info['PE Ratio']}")
+    st.write(f"**Price to Operating Cash Flow:** {company_info['Price to Cashflow']}")
+    st.write(f"**P/B Ratio:** {company_info['PB Ratio']}")
+    st.write(f"**EPS:** {company_info['EPS']}")
+    
+    # Recommendations based on P/E ratio
+    st.write("### Recommendation")
+    if company_info['PE Ratio'] != "N/A" and company_info['PE Ratio'] < 15:
+        recommendation = "Buy"
+        description = "Undervalued"
+    elif company_info['PE Ratio'] != "N/A" and company_info['PE Ratio'] > 25:
+        recommendation = "Sell"
+        description = "Overvalued"
+    else:
+        recommendation = "Hold"
+        description = "Fairly Valued"
+    
+    st.write(f"**Recommendation:** {recommendation}")
+    st.write(f"**Description:** {description}")
+    
+    # 3. Technical Analysis
+    st.header("Technical Analysis")
+    
+    # Calculate SMA, RSI, MACD
+    stock_data['SMA_50'] = calculate_sma(stock_data, 50)
+    stock_data['SMA_200'] = calculate_sma(stock_data, 200)
+    stock_data['RSI'] = calculate_rsi(stock_data, 20)
+    stock_data['MACD'] = calculate_macd(stock_data)
+    
+    # Plotting with Plotly
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=stock_data.index, y=stock_data['Close'], mode='lines', name="Close Price"))
+    fig.add_trace(go.Scatter(x=stock_data.index, y=stock_data['SMA_50'], mode='lines', name="SMA 50"))
+    fig.add_trace(go.Scatter(x=stock_data.index, y=stock_data['SMA_200'], mode='lines', name="SMA 200"))
+    fig.update_layout(title="Close Price with SMA 50 and 200", template="plotly_dark")
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # RSI
+    st.write("### RSI (20)")
+    fig_rsi = go.Figure()
+    fig_rsi.add_trace(go.Scatter(x=stock_data.index, y=stock_data['RSI'], mode='lines', name="RSI"))
+    fig_rsi.update_layout(title="RSI (20)", template="plotly_dark")
+    st.plotly_chart(fig_rsi, use_container_width=Tr
