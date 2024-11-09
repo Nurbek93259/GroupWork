@@ -56,7 +56,8 @@ def load_stock_data(ticker):
 
 # Caching company information fetching
 @st.cache_data
-def get_company_info(stock):
+def get_company_info(ticker):
+    stock = yf.Ticker(ticker)
     return {
         "Sector": stock.info.get("sector", "N/A"),
         "Country": stock.info.get("country", "N/A"),
@@ -81,8 +82,7 @@ def main():
     
     # Load stock data and company info
     stock_data = load_stock_data(ticker)
-    stock = yf.Ticker(ticker)
-    company_info = get_company_info(stock)
+    company_info = get_company_info(ticker)
     
     # 1. Company Information
     st.header("Company Information")
