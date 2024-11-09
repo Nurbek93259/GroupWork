@@ -146,9 +146,12 @@ def main():
     st.header("Prediction Model")
     stock_data['Target'] = np.where(stock_data['Close'].shift(-1) > stock_data['Close'], 1, 0)
     
-    # Use relevant features for prediction
-    features = stock_data[['SMA_50', 'SMA_200', 'RSI', 'MACD']].dropna()
-    target = stock_data['Target'].dropna()
+    # Use relevant features for prediction and drop rows with missing values
+    feature_columns = ['SMA_50', 'SMA_200', 'RSI', 'MACD']
+    stock_data = stock_data.dropna(subset=feature_columns + ['Target'])
+    
+    features = stock_data[feature_columns]
+    target = stock_data['Target']
     
     X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.2, random_state=42)
     model = train_model(X_train, y_train)
