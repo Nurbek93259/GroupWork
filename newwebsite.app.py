@@ -1,97 +1,201 @@
-pip install streamlit yfinance pandas numpy matplotlib
 import streamlit as st
-import yfinance as yf
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
+import yfinance as yf
+from ta.volatility import BollingerBands
+from ta.trend import MACD, EMAIndicator, SMAIndicator, WMAIndicator
+from ta.momentum import RSIIndicator
+import datetime
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.neighbors import KNeighborsRegressor
+from xgboost import XGBRegressor
+from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor, GradientBoostingRegressor
+from sklearn.svm import SVR
+from sklearn.tree import DecisionTreeRegressor
+import lightgbm as lgb
+from catboost import CatBoostRegressor
+from sklearn.metrics import r2_score, mean_absolute_error
+import plotly.graph_objects as go
 
-# Streamlit app title and description
-st.title("Technical Indicator Dashboard")
-st.write("Explore various technical indicators for stock analysis.")
+# Set up the titles in Streamlit Application
+st.title('Welcome to the Stock Technical Analysis Application')
+st.sidebar.info("This website was created and designed by [IUJ Group]")
+st.sidebar.info('Please fill the cells below:')
 
-# Sidebar for user input
-ticker = st.sidebar.text_input("Enter Stock Ticker", value="AAPL", max_chars=10)
-start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2021-01-01"))
-end_date = st.sidebar.date_input("End Date", pd.to_datetime("2023-01-01"))
-st.sidebar.write("### Indicator Settings")
-sma_period = st.sidebar.slider("Simple Moving Average (SMA) Period", 5, 200, 50)
-ema_period = st.sidebar.slider("Exponential Moving Average (EMA) Period", 5, 200, 20)
-rsi_period = st.sidebar.slider("Relative Strength Index (RSI) Period", 5, 50, 14)
+# Create main function in main interface with 3 categories "Visualize", "Recent Data" and "Predict"
+def main():
+    option = st.sidebar.selectbox('Make a choice', ['Visualize', 'Recent Data', 'Predict'])
+    if option == 'Visualize':
+        tech_indicators()
+    elif option == 'Recent Data':
+        dataframe()
+    else:
+        predict()
 
-# Fetch stock data
-data = yf.download(ticker, start=start_date, end=end_date)
-data['Close'] = data['Close'].fillna(method='ffill')
+# Set up data downloading function from Yahoo Finance
+def download_data(op, start_date, end_date):
+    df = yf.download(op, start=start_date, end=end_date, progress=False)
+    return df
 
-# Calculate Technical Indicators
-data['SMA'] = data['Close'].rolling(window=sma_period).mean()
-data['EMA'] = data['Close'].ewm(span=ema_period, adjust=False).mean()
+# Set up input information from users
+option = st.sidebar.text_input('Enter a Stock Symbol', value='AAPL')
+option = option.upper()
+today = datetime.date.today()
+duration = st.sidebar.number_input('Enter the duration', value=3000)
+before = today - datetime.timedelta(days=duration)
+start_date = st.sidebar.date_input('Start Date', value=before)
+end_date = st.sidebar.date_input('End date', today)
+if st.sidebar.button('Send'):
+    if start_date < end_date:
+        st.sidebar.success('Start date: `%s`\n\nEnd date: `%s`' % (start_date, end_date))
+        data = download_data(option, start_date, end_date)
+    else:
+        st.sidebar.error('Error: End date must fall after start date')
 
-# RSI Calculation
-delta = data['Close'].diff()
-gain = (delta.where(delta > 0, 0)).rolling(window=rsi_period).mean()
-loss = (-delta.where(delta < 0, 0)).rolling(window=rsi_period).mean()
-rs = gain / loss
-data['RSI'] = 100 - (100 / (1 + rs))
+data = download_data(option, start_date, end_date)
+scaler = StandardScaler()
 
-# MACD Calculation
-data['EMA_12'] = data['Close'].ewm(span=12, adjust=False).mean()
-data['EMA_26'] = data['Close'].ewm(span=26, adjust=False).mean()
-data['MACD'] = data['EMA_12'] - data['EMA_26']
-data['Signal'] = data['MACD'].ewm(span=9, adjust=False).mean()
+def tech_indicators():
+    st.header('Technical Indicators')
+    indicators = st.multiselect('Choose Technical Indicators to Visualize', ['Close Price', 'Volume','Bollinger Bands', 'Moving Average Convergence Divergence', 'Relative Strength Indicator', 'Simple Moving Average (SMA)', 'Exponential Moving Average (EMA)', 'Weighted Moving Average (WMA)', 'Moving Average (MA)'])
 
-# Bollinger Bands Calculation
-data['20_SMA'] = data['Close'].rolling(window=20).mean()
-data['BB_upper'] = data['20_SMA'] + (data['Close'].rolling(window=20).std() * 2)
-data['BB_lower'] = data['20_SMA'] - (data['Close'].rolling(window=20).std() * 2)
+    fig = go.Figure()
 
-# Plotting
-st.write(f"### {ticker} Stock Data and Indicators")
+    # Plot Close Price
+    if 'Close Price' in indicators:
+        fig.add_trace(go.Scatter(x=data.index, y=data['Close'], mode='lines', name='Close Price'))
 
-# Line Chart: Stock Price with SMA and EMA
-st.write("#### Stock Price with Moving Averages")
-fig, ax = plt.subplots()
-ax.plot(data.index, data['Close'], label='Close Price', color='blue')
-ax.plot(data.index, data['SMA'], label=f'{sma_period}-Day SMA', color='orange')
-ax.plot(data.index, data['EMA'], label=f'{ema_period}-Day EMA', color='green')
-ax.set_xlabel('Date')
-ax.set_ylabel('Price')
-ax.legend()
-st.pyplot(fig)
+    # Plot SMA
+    if 'Simple Moving Average (SMA)' in indicators:
+        sma_windows = st.text_input('Enter SMA windows (comma-separated):', '50,200')
+        for window in map(int, sma_windows.split(',')):
+            data[f'sma_{window}'] = SMAIndicator(data.Close, window=window).sma_indicator()
+            fig.add_trace(go.Scatter(x=data.index, y=data[f'sma_{window}'], mode='lines', name=f'SMA {window}'))
 
-# RSI Plot
-st.write("#### Relative Strength Index (RSI)")
-fig, ax = plt.subplots()
-ax.plot(data.index, data['RSI'], label='RSI', color='purple')
-ax.axhline(70, linestyle='--', alpha=0.5, color='red')  # Overbought level
-ax.axhline(30, linestyle='--', alpha=0.5, color='green')  # Oversold level
-ax.set_xlabel('Date')
-ax.set_ylabel('RSI')
-ax.legend()
-st.pyplot(fig)
+    # Plot EMA
+    if 'Exponential Moving Average (EMA)' in indicators:
+        ema_windows = st.text_input('Enter EMA windows (comma-separated):', '50,200')
+        for window in map(int, ema_windows.split(',')):
+            data[f'ema_{window}'] = EMAIndicator(data.Close, window=window).ema_indicator()
+            fig.add_trace(go.Scatter(x=data.index, y=data[f'ema_{window}'], mode='lines', name=f'EMA {window}'))
 
-# MACD Plot
-st.write("#### Moving Average Convergence Divergence (MACD)")
-fig, ax = plt.subplots()
-ax.plot(data.index, data['MACD'], label='MACD', color='blue')
-ax.plot(data.index, data['Signal'], label='Signal Line', color='orange')
-ax.bar(data.index, data['MACD'] - data['Signal'], label='MACD Histogram', color='gray', alpha=0.5)
-ax.set_xlabel('Date')
-ax.set_ylabel('MACD')
-ax.legend()
-st.pyplot(fig)
+    # Plot WMA
+    if 'Weighted Moving Average (WMA)' in indicators:
+        wma_windows = st.text_input('Enter WMA windows (comma-separated):', '50,200')
+        for window in map(int, wma_windows.split(',')):
+            data[f'wma_{window}'] = WMAIndicator(data.Close, window=window).wma()
+            fig.add_trace(go.Scatter(x=data.index, y=data[f'wma_{window}'], mode='lines', name=f'WMA {window}'))
 
-# Bollinger Bands Plot
-st.write("#### Bollinger Bands")
-fig, ax = plt.subplots()
-ax.plot(data.index, data['Close'], label='Close Price', color='blue')
-ax.plot(data.index, data['BB_upper'], label='Upper Bollinger Band', color='red', linestyle='--')
-ax.plot(data.index, data['BB_lower'], label='Lower Bollinger Band', color='red', linestyle='--')
-ax.fill_between(data.index, data['BB_lower'], data['BB_upper'], color='grey', alpha=0.3)
-ax.set_xlabel('Date')
-ax.set_ylabel('Price')
-ax.legend()
-st.pyplot(fig)
+    # Plot MA
+    if 'Moving Average (MA)' in indicators:
+        ma_windows = st.text_input('Enter MA windows (comma-separated):', '50,200')
+        for window in map(int, ma_windows.split(',')):
+            data[f'ma_{window}'] = data['Close'].rolling(window=window).mean()
+            fig.add_trace(go.Scatter(x=data.index, y=data[f'ma_{window}'], mode='lines', name=f'MA {window}'))
 
-# Display raw data table at the end
-st.write("#### Stock Data with Indicators")
-st.dataframe(data[['Close', 'SMA', 'EMA', 'RSI', 'MACD', 'Signal', 'BB_upper', 'BB_lower']].dropna())
+    st.plotly_chart(fig)
+
+    # Plot Volume in a separate chart
+    if 'Volume' in indicators:
+        st.write('Volume')
+        fig_vol = go.Figure()
+        fig_vol.add_trace(go.Scatter(x=data.index, y=data['Volume'], mode='lines', name='Volume'))
+        st.plotly_chart(fig_vol)
+
+    # Plot Bollinger Bands in a separate chart
+    if 'Bollinger Bands' in indicators:
+        st.write('Bollinger Bands')
+        bb_indicator = BollingerBands(data.Close)
+        data['bb_h'] = bb_indicator.bollinger_hband()
+        data['bb_l'] = bb_indicator.bollinger_lband()
+        fig_bb = go.Figure()
+        fig_bb.add_trace(go.Scatter(x=data.index, y=data['Close'], mode='lines', name='Close Price'))
+        fig_bb.add_trace(go.Scatter(x=data.index, y=data['bb_h'], mode='lines', name='BB High'))
+        fig_bb.add_trace(go.Scatter(x=data.index, y=data['bb_l'], mode='lines', name='BB Low'))
+        st.plotly_chart(fig_bb)
+
+    # Plot MACD in a separate chart
+    if 'Moving Average Convergence Divergence' in indicators:
+        st.write('Moving Average Convergence Divergence')
+        data['macd'] = MACD(data.Close).macd()
+        fig_macd = go.Figure()
+        fig_macd.add_trace(go.Scatter(x=data.index, y=data['macd'], mode='lines', name='MACD'))
+        st.plotly_chart(fig_macd)
+
+    # Plot RSI in a separate chart
+    if 'Relative Strength Indicator' in indicators:
+        st.write('Relative Strength Indicator')
+        data['rsi'] = RSIIndicator(data.Close).rsi()
+        fig_rsi = go.Figure()
+        fig_rsi.add_trace(go.Scatter(x=data.index, y=data['rsi'], mode='lines', name='RSI'))
+        st.plotly_chart(fig_rsi)
+
+# Showing recent data:
+def dataframe():
+    st.header('Recent Data')
+    num_days = st.number_input('Enter number of days to display', min_value=1, value=20)
+    st.dataframe(data.tail(num_days))
+
+# Function to train and evaluate models
+def model_engine(model, num):
+    df = data[['Close']]
+    df['preds'] = data.Close.shift(-num)
+    x = df.drop(['preds'], axis=1).values
+    x = scaler.fit_transform(x)
+    x_forecast = x[-num:]
+    x = x[:-num]
+    y = df.preds.values
+    y = y[:-num]
+
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=.2, random_state=10)
+    model.fit(x_train, y_train)
+    preds = model.predict(x_test)
+    st.text(f'r2_score: {r2_score(y_test, preds)} \nMAE: {mean_absolute_error(y_test, preds)}')
+
+    forecast_pred = model.predict(x_forecast)
+    day = 1
+    predictions = []
+    for i in forecast_pred:
+        predictions.append(i)
+        day += 1
+
+    forecast_dates = pd.date_range(start=data.index[-1], periods=num + 1, freq='B')[1:]
+    predicted_data = pd.DataFrame({'Date': forecast_dates, 'Predicted Price': predictions})
+
+    return predicted_data
+
+# Creating interface for choosing learning model, prediction days, etc.
+def predict():
+    model_name = st.radio('Choose a model', ['LinearRegression', 'RandomForestRegressor', 'ExtraTreesRegressor', 'KNeighborsRegressor', 'XGBoostRegressor', 'SVR', 'DecisionTreeRegressor', 'GradientBoostingRegressor', 'LightGBM', 'CatBoost'])
+    num = st.number_input('How many days do you want to forecast?', value=10)
+    num = int(num)
+    if st.button('Predict'):
+        if model_name == 'LinearRegression':
+            engine = LinearRegression()
+        elif model_name == 'RandomForestRegressor':
+            engine = RandomForestRegressor()
+        elif model_name == 'ExtraTreesRegressor':
+            engine = ExtraTreesRegressor()
+        elif model_name == 'KNeighborsRegressor':
+            engine = KNeighborsRegressor()
+        elif model_name == 'XGBoostRegressor':
+            engine = XGBRegressor()
+        elif model_name == 'SVR':
+            engine = SVR()
+        elif model_name == 'DecisionTreeRegressor':
+            engine = DecisionTreeRegressor()
+        elif model_name == 'GradientBoostingRegressor':
+            engine = GradientBoostingRegressor()
+        elif model_name == 'LightGBM':
+            engine = lgb.LGBMRegressor()
+        elif model_name == 'CatBoost':
+            engine = CatBoostRegressor(verbose=0)
+
+        predicted_data = model_engine(engine, num)
+
+        st.header('Predicted Stock Prices')
+        st.line_chart(predicted_data.set_index('Date'))
+
+if __name__ == '__main__':
+    main()
