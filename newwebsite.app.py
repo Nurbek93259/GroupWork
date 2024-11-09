@@ -49,11 +49,11 @@ def calculate_macd(data):
     ema_26 = data['Close'].ewm(span=26, adjust=False).mean()
     return ema_12 - ema_26
 
-# Caching stock data fetching
+# Caching stock data fetching for 5 years
 @st.cache_data
-def load_stock_data(ticker):
+def load_stock_data(ticker, start_date, end_date):
     stock = yf.Ticker(ticker)
-    return stock.history(period="1y")  # Temporarily reduce period to 1 year for faster loading
+    return stock.history(start=start_date, end=end_date)
 
 # Caching company information fetching
 @st.cache_data
@@ -62,22 +62,11 @@ def get_company_info(ticker):
     return {
         "Sector": stock.info.get("sector", "N/A"),
         "Country": stock.info.get("country", "N/A"),
-        "CEO": stock.info.get("ceo", "N/A"),
         "PE Ratio": stock.info.get("trailingPE", "N/A"),
         "Price to Cashflow": stock.info.get("priceToCashflow", "N/A"),
         "PB Ratio": stock.info.get("priceToBook", "N/A"),
         "EPS": stock.info.get("trailingEps", "N/A"),
     }
-
-# Fetch CEO information from Wikipedia
-@st.cache_data
-def get_ceo_bio(ceo_name):
-    wiki = wikipediaapi.Wikipedia('en')
-    page = wiki.page(ceo_name)
-    if page.exists():
-        return page.summary
-    else:
-        return "Wikipedia information not available for the specified CEO."
 
 # Caching model training
 @st.cache_resource
@@ -88,11 +77,19 @@ def train_model(X_train, y_train):
 
 # Main function
 def main():
-    # Sidebar for ticker input
-    ticker = st.sidebar.text_input("Enter Stock Ticker", "AAPL")
+    # Sidebar for ticker input and additional options
+    ticker = st.sidebar.text_input("Stock symbol:", "AAPL")
+
+    # Moving Average settings
+    short_ma_days = st.sidebar.slider("Short-term moving average days:", 10, 100, 10)
+    long_ma_days = st.sidebar.slider("Long-term moving average days:", 50, 200, 50)
     
+    # Date range for fetching data
+    start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2021-01-01"))
+    end_date = st.sidebar.date_input("End Date", pd.to_datetime("today"))
+
     # Load stock data and company info
-    stock_data = load_stock_data(ticker)
+    stock_data = load_stock_data(ticker, start_date, end_date)
     company_info = get_company_info(ticker)
     
     # 1. Company Information
@@ -100,15 +97,7 @@ def main():
     st.write("### Basic Info")
     st.write(f"**Sector:** {company_info['Sector']}")
     st.write(f"**Country:** {company_info['Country']}")
-    st.write(f"**CEO:** {company_info['CEO']}")
     
-    # CEO biography from Wikipedia
-    if company_info["CEO"] != "N/A":
-        ceo_bio = get_ceo_bio(company_info["CEO"])
-        st.write(f"### CEO Biography\n{ceo_bio}")
-    else:
-        st.write("CEO information is not available.")
-
     # 2. Fundamental Analysis
     st.header("Fundamental Analysis")
     st.write(f"**P/E Ratio:** {company_info['PE Ratio']}")
@@ -134,18 +123,18 @@ def main():
     # 3. Technical Analysis
     st.header("Technical Analysis")
     
-    # Calculate SMA, RSI, MACD
-    stock_data['SMA_50'] = calculate_sma(stock_data, 50)
-    stock_data['SMA_200'] = calculate_sma(stock_data, 200)
+    # Calculate custom SMA, RSI, MACD based on user input
+    stock_data['SMA_Short'] = calculate_sma(stock_data, short_ma_days)
+    stock_data['SMA_Long'] = calculate_sma(stock_data, long_ma_days)
     stock_data['RSI'] = calculate_rsi(stock_data, 20)
     stock_data['MACD'] = calculate_macd(stock_data)
     
     # Plotting with Plotly
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=stock_data.index, y=stock_data['Close'], mode='lines', name="Close Price"))
-    fig.add_trace(go.Scatter(x=stock_data.index, y=stock_data['SMA_50'], mode='lines', name="SMA 50"))
-    fig.add_trace(go.Scatter(x=stock_data.index, y=stock_data['SMA_200'], mode='lines', name="SMA 200"))
-    fig.update_layout(title="Close Price with SMA 50 and 200", template="plotly_dark")
+    fig.add_trace(go.Scatter(x=stock_data.index, y=stock_data['SMA_Short'], mode='lines', name=f"SMA {short_ma_days}"))
+    fig.add_trace(go.Scatter(x=stock_data.index, y=stock_data['SMA_Long'], mode='lines', name=f"SMA {long_ma_days}"))
+    fig.update_layout(title=f"Close Price with SMA {short_ma_days} and SMA {long_ma_days}", template="plotly_dark")
     st.plotly_chart(fig, use_container_width=True)
     
     # RSI
@@ -167,7 +156,7 @@ def main():
     stock_data['Target'] = np.where(stock_data['Close'].shift(-1) > stock_data['Close'], 1, 0)
     
     # Use relevant features for prediction and drop rows with missing values
-    feature_columns = ['SMA_50', 'SMA_200', 'RSI', 'MACD']
+    feature_columns = ['SMA_Short', 'SMA_Long', 'RSI', 'MACD']
     stock_data = stock_data.dropna(subset=feature_columns + ['Target'])
     
     features = stock_data[feature_columns]
