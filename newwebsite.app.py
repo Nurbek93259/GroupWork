@@ -142,4 +142,43 @@ def main():
     
     # Plotting with Plotly
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=stoc
+    fig.add_trace(go.Scatter(x=stock_data.index, y=stock_data['Close'], mode='lines', name="Close Price"))
+    fig.add_trace(go.Scatter(x=stock_data.index, y=stock_data['SMA_50'], mode='lines', name="SMA 50"))
+    fig.add_trace(go.Scatter(x=stock_data.index, y=stock_data['SMA_200'], mode='lines', name="SMA 200"))
+    fig.update_layout(title="Close Price with SMA 50 and 200", template="plotly_dark")
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # RSI
+    st.write("### RSI (20)")
+    fig_rsi = go.Figure()
+    fig_rsi.add_trace(go.Scatter(x=stock_data.index, y=stock_data['RSI'], mode='lines', name="RSI"))
+    fig_rsi.update_layout(title="RSI (20)", template="plotly_dark")
+    st.plotly_chart(fig_rsi, use_container_width=True)
+    
+    # MACD
+    st.write("### MACD")
+    fig_macd = go.Figure()
+    fig_macd.add_trace(go.Scatter(x=stock_data.index, y=stock_data['MACD'], mode='lines', name="MACD"))
+    fig_macd.update_layout(title="MACD", template="plotly_dark")
+    st.plotly_chart(fig_macd, use_container_width=True)
+    
+    # 4. Prediction Model
+    st.header("Prediction Model")
+    stock_data['Target'] = np.where(stock_data['Close'].shift(-1) > stock_data['Close'], 1, 0)
+    
+    # Use relevant features for prediction and drop rows with missing values
+    feature_columns = ['SMA_50', 'SMA_200', 'RSI', 'MACD']
+    stock_data = stock_data.dropna(subset=feature_columns + ['Target'])
+    
+    features = stock_data[feature_columns]
+    target = stock_data['Target']
+    
+    X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.2, random_state=42)
+    model = train_model(X_train, y_train)
+    accuracy = model.score(X_test, y_test)
+    
+    st.write(f"Prediction Model Accuracy: {accuracy:.2%}")
+    st.write("Use the model predictions for additional insights into stock behavior.")
+
+if __name__ == "__main__":
+    main()
