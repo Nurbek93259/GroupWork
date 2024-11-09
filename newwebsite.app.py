@@ -63,7 +63,6 @@ def get_company_info(ticker):
         "Sector": stock.info.get("sector", "N/A"),
         "Country": stock.info.get("country", "N/A"),
         "PE Ratio": stock.info.get("trailingPE", "N/A"),
-        "Price to Cashflow": stock.info.get("priceToCashflow", "N/A"),
         "PB Ratio": stock.info.get("priceToBook", "N/A"),
         "EPS": stock.info.get("trailingEps", "N/A"),
     }
@@ -101,7 +100,6 @@ def main():
     # 2. Fundamental Analysis
     st.header("Fundamental Analysis")
     st.write(f"**P/E Ratio:** {company_info['PE Ratio']}")
-    st.write(f"**Price to Operating Cash Flow:** {company_info['Price to Cashflow']}")
     st.write(f"**P/B Ratio:** {company_info['PB Ratio']}")
     st.write(f"**EPS:** {company_info['EPS']}")
     
@@ -171,7 +169,6 @@ def main():
         accuracy = model.score(X_test, y_test)
         
         st.write(f"Prediction Model Accuracy: {accuracy:.2%}")
-        st.write("Use the model predictions for additional insights into stock behavior.")
 
 if __name__ == "__main__":
     main()
