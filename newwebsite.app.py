@@ -3,159 +3,105 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
-from datetime import datetime
 import plotly.graph_objects as go
+from datetime import datetime
 
-# Define a valid path for saving the script
-script_dir = os.path.join(os.getcwd(), "generated_scripts")
-os.makedirs(script_dir, exist_ok=True)  # Create the directory if it doesn't exist
+# Create the app layout
+st.set_page_config(page_title="Stock Analysis App", layout="wide")
 
-# Technical Analysis Functions
-def download_data(ticker, start_date, end_date):
-    try:
-        stock_data = yf.download(ticker, start=start_date, end=end_date)
-        return stock_data
-    except Exception as e:
-        st.error(f"Error downloading data: {e}")
-        return None
+# Sidebar Options
+st.sidebar.title("Stock Analysis Options")
+option = st.sidebar.radio("Choose Analysis Type:", ["Company Overview & Fundamental Analysis", "Technical Analysis"])
 
-def calculate_moving_averages(data, short_window=50, long_window=200):
-    data['SMA_short'] = data['Close'].rolling(window=short_window).mean()
-    data['SMA_long'] = data['Close'].rolling(window=long_window).mean()
-    data['EMA_short'] = data['Close'].ewm(span=short_window, adjust=False).mean()
-    data['EMA_long'] = data['Close'].ewm(span=long_window, adjust=False).mean()
-
-def calculate_rsi(data, window=14):
-    delta = data['Close'].diff(1)
-    gain = (delta.where(delta > 0, 0)).rolling(window).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window).mean()
-    rs = gain / loss
-    data['RSI'] = 100 - (100 / (1 + rs))
-
-def calculate_macd(data, short_span=12, long_span=26, signal_span=9):
-    data['MACD'] = data['Close'].ewm(span=short_span, adjust=False).mean() - data['Close'].ewm(span=long_span, adjust=False).mean()
-    data['Signal_Line'] = data['MACD'].ewm(span=signal_span, adjust=False).mean()
-
-def generate_recommendations(data):
-    recommendations = []
-
-    if not data['SMA_short'].isnull().iloc[-1] and not data['SMA_long'].isnull().iloc[-1]:
-        action = "BUY" if data['SMA_short'].iloc[-1] > data['SMA_long'].iloc[-1] else "SELL"
-        recommendations.append({
-            "Indicator": "SMA (50 vs 200)",
-            "Action": action,
-            "Explanation": "Short-term average is higher than long-term (Buy) or lower (Sell).",
-            "Pros": "Good for identifying long-term trends.",
-            "Cons": "Can be slow to respond to rapid changes."
-        })
-
-    if not data['EMA_short'].isnull().iloc[-1] and not data['EMA_long'].isnull().iloc[-1]:
-        action = "BUY" if data['EMA_short'].iloc[-1] > data['EMA_long'].iloc[-1] else "SELL"
-        recommendations.append({
-            "Indicator": "EMA (50 vs 200)",
-            "Action": action,
-            "Explanation": "Short-term EMA is higher than long-term (Buy) or lower (Sell).",
-            "Pros": "Responds quickly to recent price changes.",
-            "Cons": "Can give false signals in volatile markets."
-        })
-
-    if not data['RSI'].isnull().iloc[-1]:
-        if data['RSI'].iloc[-1] < 30:
-            action = "BUY"
-            explanation = "RSI indicates the stock is oversold."
-        elif data['RSI'].iloc[-1] > 70:
-            action = "SELL"
-            explanation = "RSI indicates the stock is overbought."
-        else:
-            action = "HOLD"
-            explanation = "RSI is in a neutral range."
-        recommendations.append({
-            "Indicator": "RSI",
-            "Action": action,
-            "Explanation": explanation,
-            "Pros": "Helps spot good entry and exit points.",
-            "Cons": "May not work well in trending markets."
-        })
-
-    if not data['MACD'].isnull().iloc[-1] and not data['Signal_Line'].isnull().iloc[-1]:
-        action = "BUY" if data['MACD'].iloc[-1] > data['Signal_Line'].iloc[-1] else "SELL"
-        recommendations.append({
-            "Indicator": "MACD",
-            "Action": action,
-            "Explanation": "MACD shows momentum is upward (Buy) or downward (Sell).",
-            "Pros": "Good for identifying trend reversals.",
-            "Cons": "May lag in volatile conditions."
-        })
-
-    return recommendations
-
-def plot_analysis(data, ticker):
-    st.write(f"### Technical Analysis for {ticker}")
-    plt.figure(figsize=(12, 6))
-    plt.plot(data['Close'], label='Close Price', color='blue')
-    plt.plot(data['SMA_short'], label='SMA (50)', color='orange')
-    plt.plot(data['SMA_long'], label='SMA (200)', color='green')
-    plt.plot(data['EMA_short'], label='EMA (50)', linestyle='--', color='red')
-    plt.plot(data['EMA_long'], label='EMA (200)', linestyle='--', color='purple')
-    plt.title('Price and Moving Averages')
-    plt.legend()
-    st.pyplot(plt)
-
-    plt.figure(figsize=(12, 4))
-    plt.plot(data['RSI'], label='RSI', color='purple')
-    plt.axhline(70, linestyle='--', color='red', label='Overbought')
-    plt.axhline(30, linestyle='--', color='green', label='Oversold')
-    plt.title('RSI Indicator')
-    plt.legend()
-    st.pyplot(plt)
-
-    plt.figure(figsize=(12, 4))
-    plt.plot(data['MACD'], label='MACD', color='blue')
-    plt.plot(data['Signal_Line'], label='Signal Line', color='orange')
-    plt.axhline(0, linestyle='--', color='gray', label='Zero Line')
-    plt.title('MACD Indicator')
-    plt.legend()
-    st.pyplot(plt)
-
-# Main App Interface
-st.title("Stock Analysis App")
-option = st.sidebar.selectbox("Choose Analysis Type:", ["Company Overview & Fundamental Analysis", "Technical Analysis"])
-
+# User Input for Stock Ticker
 ticker = st.sidebar.text_input("Enter Stock Ticker (e.g., AAPL):", "AAPL")
 
-if option == "Company Overview & Fundamental Analysis":
+# Fetch Stock Data
+if ticker:
     stock = yf.Ticker(ticker)
-    info = stock.info
-    st.title(f"{info['longName']} ({ticker.upper()})")
 
-    with st.expander("About the Company"):
+    # Company Overview & Fundamental Analysis
+    if option == "Company Overview & Fundamental Analysis":
+        st.title(f"Company Overview: {ticker.upper()}")
+
+        # Company Details
+        info = stock.info
+        st.subheader("About the Company")
         st.write(info.get("longBusinessSummary", "Company information is not available."))
+        st.write(f"**Industry:** {info.get('industry', 'N/A')}")
+        st.write(f"**Country:** {info.get('country', 'N/A')}")
+        if "website" in info:
+            st.markdown(f"[**Website**]({info['website']})", unsafe_allow_html=True)
 
-    st.write(f"**Industry:** {info.get('industry', 'N/A')}")
-    st.write(f"**Country:** {info.get('country', 'N/A')}")
-    st.markdown(f"[**Website**]({info.get('website', '')})" if info.get("website") else "**Website:** N/A", unsafe_allow_html=True)
-    
-    st.write("#### Candlestick Chart")
-    historical = stock.history(period="1y")
-    fig = go.Figure(data=[go.Candlestick(x=historical.index,
-                                         open=historical['Open'],
-                                         high=historical['High'],
-                                         low=historical['Low'],
-                                         close=historical['Close'])])
-    st.plotly_chart(fig, use_container_width=True)
+        # Candlestick Chart
+        st.subheader("Stock Performance: Candlestick Chart")
+        historical = stock.history(period="1y")
+        fig = go.Figure(
+            data=[
+                go.Candlestick(
+                    x=historical.index,
+                    open=historical['Open'],
+                    high=historical['High'],
+                    low=historical['Low'],
+                    close=historical['Close'],
+                )
+            ]
+        )
+        fig.update_layout(
+            title=f"Candlestick Chart for {ticker.upper()}",
+            xaxis_title="Date",
+            yaxis_title="Price (USD)",
+            template="plotly_white",
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
-elif option == "Technical Analysis":
-    st.write("### Technical Analysis")
-    start_date = st.date_input("Start Date", datetime(2022, 1, 1))
-    end_date = st.date_input("End Date", datetime(2023, 1, 1))
+        # Financial Metrics
+        st.subheader("Financial Metrics")
+        financials = stock.financials.T
+        if not financials.empty:
+            st.write("Net Income (Last 4 Years):")
+            financials = financials.head(4)
+            st.write(financials[['Net Income']])
+        else:
+            st.warning("Financial data is not available.")
 
-    if st.button("Perform Technical Analysis"):
-        stock_data = download_data(ticker, start_date, end_date)
-        if stock_data is not None:
-            calculate_moving_averages(stock_data)
-            calculate_rsi(stock_data)
-            calculate_macd(stock_data)
-            plot_analysis(stock_data, ticker)
-            recommendations = generate_recommendations(stock_data)
-            st.write("#### Recommendations and Explanations")
-            st.dataframe(pd.DataFrame(recommendations))
+    # Technical Analysis
+    elif option == "Technical Analysis":
+        st.title(f"Technical Analysis: {ticker.upper()}")
+
+        # Input Dates
+        start_date = st.sidebar.date_input("Start Date", datetime(2022, 1, 1))
+        end_date = st.sidebar.date_input("End Date", datetime(2023, 1, 1))
+
+        # Fetch and Process Data
+        try:
+            stock_data = stock.history(start=start_date, end=end_date)
+            stock_data['SMA_50'] = stock_data['Close'].rolling(window=50).mean()
+            stock_data['SMA_200'] = stock_data['Close'].rolling(window=200).mean()
+            stock_data['RSI'] = 100 - (100 / (1 + stock_data['Close'].pct_change().rolling(window=14).mean()))
+
+            # Display Data
+            st.subheader("Price Chart with Moving Averages")
+            plt.figure(figsize=(10, 5))
+            plt.plot(stock_data.index, stock_data['Close'], label="Close Price", color="blue")
+            plt.plot(stock_data.index, stock_data['SMA_50'], label="50-Day SMA", color="orange")
+            plt.plot(stock_data.index, stock_data['SMA_200'], label="200-Day SMA", color="green")
+            plt.title("Stock Price with Moving Averages")
+            plt.xlabel("Date")
+            plt.ylabel("Price (USD)")
+            plt.legend()
+            st.pyplot(plt)
+
+            # Recommendations
+            st.subheader("Recommendations Based on Indicators")
+            recommendations = []
+            if stock_data['SMA_50'].iloc[-1] > stock_data['SMA_200'].iloc[-1]:
+                recommendations.append({"Indicator": "SMA (50 vs 200)", "Recommendation": "BUY"})
+            else:
+                recommendations.append({"Indicator": "SMA (50 vs 200)", "Recommendation": "SELL"})
+            st.table(pd.DataFrame(recommendations))
+
+        except Exception as e:
+            st.error(f"Error fetching data: {e}")
+else:
+    st.warning("Please enter a valid stock ticker.")
