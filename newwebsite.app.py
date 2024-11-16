@@ -1,7 +1,3 @@
-# Correcting the variable reference and writing the updated script to a file
-google_news_script_24h_path = "/mnt/data/technical_sentiment_google_news_24h.py"
-
-updated_google_news_code_24h_corrected = """
 import os
 import streamlit as st
 import yfinance as yf
