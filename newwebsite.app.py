@@ -1,180 +1,128 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import numpy as np
-import plotly.graph_objs as go
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
 
-# Set page configuration (must be the first Streamlit command)
-st.set_page_config(page_title="Stock Analysis Dashboard", layout="wide", initial_sidebar_state="expanded")
+# Streamlit app details
+st.set_page_config(page_title="Financial Analysis", layout="wide")
 
-# Minimalist black theme styling
-st.markdown("""
-    <style>
-    body {
-        background-color: #1c1c1c;
-        color: #e0e0e0;
-    }
-    .css-1v3fvcr {
-        background-color: #1c1c1c !important;
-    }
-    .stButton>button {
-        background-color: #00BFFF !important;
-        color: white !important;
-    }
-    .css-2trqyj {
-        color: white !important;
-    }
-    h1, h2, h3, h4, h5 {
-        color: #00BFFF;
-    }
-    </style>
-""", unsafe_allow_html=True)
+with st.sidebar:
+    st.title("Financial Analysis")
+    ticker = st.text_input("Enter a stock ticker (e.g. AAPL)", "AAPL")
+    period = st.selectbox("Enter a time frame", ("1D", "5D", "1M", "6M", "YTD", "1Y", "5Y"), index=2)
+    button = st.button("Submit")
 
-# Helper functions for technical indicators
-def calculate_sma(data, period=50):
-    return data['Close'].rolling(window=period).mean()
+# Format market cap and enterprise value into something readable
+def format_value(value):
+    if not isinstance(value, (int, float)):
+        return "N/A"
+    suffixes = ["", "K", "M", "B", "T"]
+    suffix_index = 0
+    while value >= 1000 and suffix_index < len(suffixes) - 1:
+        value /= 1000
+        suffix_index += 1
+    return f"${value:.1f}{suffixes[suffix_index]}"
 
-def calculate_rsi(data, period=20):
-    delta = data['Close'].diff(1)
-    gain = delta.where(delta > 0, 0).rolling(window=period).mean()
-    loss = -delta.where(delta < 0, 0).rolling(window=period).mean()
-    rs = gain / loss
-    return 100 - (100 / (1 + rs))
-
-def calculate_macd(data):
-    ema_12 = data['Close'].ewm(span=12, adjust=False).mean()
-    ema_26 = data['Close'].ewm(span=26, adjust=False).mean()
-    return ema_12 - ema_26
-
-# Caching stock data fetching for 5 years
-@st.cache_data
-def load_stock_data(ticker, start_date, end_date):
-    stock = yf.Ticker(ticker)
-    return stock.history(start=start_date, end=end_date)
-
-# Caching company information fetching
-@st.cache_data
-def get_company_info(ticker):
-    stock = yf.Ticker(ticker)
-    return {
-        "Sector": stock.info.get("sector", "N/A"),
-        "Country": stock.info.get("country", "N/A"),
-        "PE Ratio": stock.info.get("trailingPE", "N/A"),
-        "PB Ratio": stock.info.get("priceToBook", "N/A"),
-        "EPS": stock.info.get("trailingEps", "N/A"),
-    }
-
-# Caching model training
-@st.cache_resource
-def train_model(X_train, y_train):
-    model = RandomForestClassifier(n_estimators=10)  # Reduced number of estimators for faster training
-    model.fit(X_train, y_train)
-    return model
-
-# Main function
-def main():
-    # Sidebar for ticker input and additional options
-    ticker = st.sidebar.text_input("Stock symbol:", "AAPL")
-
-    # Moving Average settings
-    short_ma_days = st.sidebar.slider("Short-term moving average days:", 10, 100, 10)
-    long_ma_days = st.sidebar.slider("Long-term moving average days:", 50, 200, 50)
-    
-    # Date range for fetching data
-    start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2021-01-01"))
-    end_date = st.sidebar.date_input("End Date", pd.to_datetime("today"))
-
-    # Load stock data and company info
-    stock_data = load_stock_data(ticker, start_date, end_date)
-    company_info = get_company_info(ticker)
-    
-    # 1. Company Information
-    st.header("Company Information")
-    st.write("### Basic Info")
-    st.write(f"**Sector:** {company_info['Sector']}")
-    st.write(f"**Country:** {company_info['Country']}")
-    
-    # 2. Fundamental Analysis
-    st.header("Fundamental Analysis")
-    pe_ratio = company_info['PE Ratio']
-    if pe_ratio != "N/A":
+# If Submit button is clicked
+if button:
+    if not ticker.strip():
+        st.error("Please provide a valid stock ticker.")
+    else:
         try:
-            pe_ratio = float(pe_ratio)
-        except ValueError:
-            pass  # Leave it as is if conversion fails
-    
-    st.write(f"**P/E Ratio:** {pe_ratio}")
-    st.write(f"**P/B Ratio:** {company_info['PB Ratio']}")
-    st.write(f"**EPS:** {company_info['EPS']}")
-    
-    # Recommendations based on P/E ratio
-    st.write("### Recommendation")
-    if isinstance(pe_ratio, (int, float)) and pe_ratio < 15:
-        recommendation = "Buy"
-        description = "Undervalued"
-    elif isinstance(pe_ratio, (int, float)) and pe_ratio > 25:
-        recommendation = "Sell"
-        description = "Overvalued"
-    else:
-        recommendation = "Hold"
-        description = "Fairly Valued"
-    
-    st.write(f"**Recommendation:** {recommendation}")
-    st.write(f"**Description:** {description}")
-    
-    # 3. Technical Analysis
-    st.header("Technical Analysis")
-    
-    # Calculate custom SMA, RSI, MACD based on user input
-    stock_data['SMA_Short'] = calculate_sma(stock_data, short_ma_days)
-    stock_data['SMA_Long'] = calculate_sma(stock_data, long_ma_days)
-    stock_data['RSI'] = calculate_rsi(stock_data, 20)
-    stock_data['MACD'] = calculate_macd(stock_data)
-    
-    # Plotting with Plotly
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=stock_data.index, y=stock_data['Close'], mode='lines', name="Close Price"))
-    fig.add_trace(go.Scatter(x=stock_data.index, y=stock_data['SMA_Short'], mode='lines', name=f"SMA {short_ma_days}"))
-    fig.add_trace(go.Scatter(x=stock_data.index, y=stock_data['SMA_Long'], mode='lines', name=f"SMA {long_ma_days}"))
-    fig.update_layout(title=f"Close Price with SMA {short_ma_days} and SMA {long_ma_days}", template="plotly_dark")
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # RSI
-    st.write("### RSI (20)")
-    fig_rsi = go.Figure()
-    fig_rsi.add_trace(go.Scatter(x=stock_data.index, y=stock_data['RSI'], mode='lines', name="RSI"))
-    fig_rsi.update_layout(title="RSI (20)", template="plotly_dark")
-    st.plotly_chart(fig_rsi, use_container_width=True)
-    
-    # MACD
-    st.write("### MACD")
-    fig_macd = go.Figure()
-    fig_macd.add_trace(go.Scatter(x=stock_data.index, y=stock_data['MACD'], mode='lines', name="MACD"))
-    fig_macd.update_layout(title="MACD", template="plotly_dark")
-    st.plotly_chart(fig_macd, use_container_width=True)
-    
-    # 4. Prediction Model
-    st.header("Prediction Model")
-    stock_data['Target'] = np.where(stock_data['Close'].shift(-1) > stock_data['Close'], 1, 0)
-    
-    # Use relevant features for prediction and drop rows with missing values
-    feature_columns = ['SMA_Short', 'SMA_Long', 'RSI', 'MACD']
-    stock_data = stock_data.dropna(subset=feature_columns + ['Target'])
-    
-    features = stock_data[feature_columns]
-    target = stock_data['Target']
-    
-    # Check if there is enough data for train_test_split
-    if len(features) < 5:  # Adjust threshold based on minimum requirement for train_test_split
-        st.write("Not enough data available for prediction within the selected date range and indicator settings.")
-    else:
-        X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.2, random_state=42)
-        model = train_model(X_train, y_train)
-        accuracy = model.score(X_test, y_test)
-        
-        st.write(f"Prediction Model Accuracy: {accuracy:.2%}")
+            with st.spinner('Please wait...'):
+                # Retrieve stock data
+                stock = yf.Ticker(ticker)
+                info = stock.info
 
-if __name__ == "__main__":
-    main()
+                st.subheader(f"{ticker} - {info.get('longName', 'N/A')}")
+
+                # Plot historical stock price data
+                if period == "1D":
+                    history = stock.history(period="1d", interval="1h")
+                elif period == "5D":
+                    history = stock.history(period="5d", interval="1d")
+                elif period == "1M":
+                    history = stock.history(period="1mo", interval="1d")
+                elif period == "6M":
+                    history = stock.history(period="6mo", interval="1wk")
+                elif period == "YTD":
+                    history = stock.history(period="ytd", interval="1mo")
+                elif period == "1Y":
+                    history = stock.history(period="1y", interval="1mo")
+                elif period == "5Y":
+                    history = stock.history(period="5y", interval="3mo")
+                
+                chart_data = pd.DataFrame(history["Close"])
+                st.line_chart(chart_data)
+
+                col1, col2, col3 = st.columns(3)
+
+                # Display stock information as a dataframe
+                country = info.get('country', 'N/A')
+                sector = info.get('sector', 'N/A')
+                industry = info.get('industry', 'N/A')
+                market_cap = format_value(info.get('marketCap', None))
+                ent_value = format_value(info.get('enterpriseValue', None))
+                employees = info.get('fullTimeEmployees', 'N/A')
+
+                stock_info = [
+                    ("Stock Info", "Value"),
+                    ("Country", country),
+                    ("Sector", sector),
+                    ("Industry", industry),
+                    ("Market Cap", market_cap),
+                    ("Enterprise Value", ent_value),
+                    ("Employees", employees)
+                ]
+                
+                df = pd.DataFrame(stock_info[1:], columns=stock_info[0])
+                col1.dataframe(df, width=400, hide_index=True)
+                
+                # Display price information as a dataframe
+                def safe_format(value, prefix="$", suffix=""):
+                    if not isinstance(value, (int, float)):
+                        return "N/A"
+                    return f"{prefix}{value:.2f}{suffix}"
+
+                current_price = safe_format(info.get('currentPrice'))
+                prev_close = safe_format(info.get('previousClose'))
+                day_high = safe_format(info.get('dayHigh'))
+                day_low = safe_format(info.get('dayLow'))
+                ft_week_high = safe_format(info.get('fiftyTwoWeekHigh'))
+                ft_week_low = safe_format(info.get('fiftyTwoWeekLow'))
+                
+                price_info = [
+                    ("Price Info", "Value"),
+                    ("Current Price", current_price),
+                    ("Previous Close", prev_close),
+                    ("Day High", day_high),
+                    ("Day Low", day_low),
+                    ("52 Week High", ft_week_high),
+                    ("52 Week Low", ft_week_low)
+                ]
+                
+                df = pd.DataFrame(price_info[1:], columns=price_info[0])
+                col2.dataframe(df, width=400, hide_index=True)
+
+                # Display business metrics as a dataframe
+                forward_eps = safe_format(info.get('forwardEps'), prefix="")
+                forward_pe = safe_format(info.get('forwardPE'), prefix="")
+                peg_ratio = safe_format(info.get('pegRatio'), prefix="")
+                dividend_rate = safe_format(info.get('dividendRate'))
+                dividend_yield = safe_format(info.get('dividendYield', 0) * 100, suffix="%")
+                recommendation = info.get('recommendationKey', 'N/A').capitalize()
+                
+                biz_metrics = [
+                    ("Business Metrics", "Value"),
+                    ("EPS (FWD)", forward_eps),
+                    ("P/E (FWD)", forward_pe),
+                    ("PEG Ratio", peg_ratio),
+                    ("Div Rate (FWD)", dividend_rate),
+                    ("Div Yield (FWD)", dividend_yield),
+                    ("Recommendation", recommendation)
+                ]
+                
+                df = pd.DataFrame(biz_metrics[1:], columns=biz_metrics[0])
+                col3.dataframe(df, width=400, hide_index=True)
+
+        except Exception as e:
+            st.error(f"An error occurred: {str(e)}")
