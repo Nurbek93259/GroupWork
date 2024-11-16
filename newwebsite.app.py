@@ -3,10 +3,7 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
-from datetime import datetime, timedelta
-from textblob import TextBlob
-from bs4 import BeautifulSoup
-import requests
+from datetime import datetime
 
 # Define a valid path for saving the script
 script_dir = os.path.join(os.getcwd(), "generated_scripts")
@@ -42,24 +39,52 @@ def generate_recommendations(data):
     recommendations = []
 
     if not data['SMA_short'].isnull().iloc[-1] and not data['SMA_long'].isnull().iloc[-1]:
-        recommendations.append({"Indicator": "SMA (50 vs 200)", "Action": "SELL" if data['SMA_short'].iloc[-1] <= data['SMA_long'].iloc[-1] else "BUY", 
-                                "Explanation": "Short-term average is higher than long-term (Buy) or lower (Sell)."})
+        action = "BUY" if data['SMA_short'].iloc[-1] > data['SMA_long'].iloc[-1] else "SELL"
+        recommendations.append({
+            "Indicator": "SMA (50 vs 200)",
+            "Action": action,
+            "Explanation": "Short-term average is higher than long-term (Buy) or lower (Sell).",
+            "Pros": "Good for identifying long-term trends.",
+            "Cons": "Can be slow to respond to rapid changes."
+        })
 
     if not data['EMA_short'].isnull().iloc[-1] and not data['EMA_long'].isnull().iloc[-1]:
-        recommendations.append({"Indicator": "EMA (50 vs 200)", "Action": "SELL" if data['EMA_short'].iloc[-1] <= data['EMA_long'].iloc[-1] else "BUY", 
-                                "Explanation": "Short-term EMA is higher than long-term (Buy) or lower (Sell)."})
+        action = "BUY" if data['EMA_short'].iloc[-1] > data['EMA_long'].iloc[-1] else "SELL"
+        recommendations.append({
+            "Indicator": "EMA (50 vs 200)",
+            "Action": action,
+            "Explanation": "Short-term EMA is higher than long-term (Buy) or lower (Sell).",
+            "Pros": "Responds quickly to recent price changes.",
+            "Cons": "Can give false signals in volatile markets."
+        })
 
     if not data['RSI'].isnull().iloc[-1]:
         if data['RSI'].iloc[-1] < 30:
-            recommendations.append({"Indicator": "RSI", "Action": "BUY", "Explanation": "RSI indicates oversold condition."})
+            action = "BUY"
+            explanation = "RSI indicates the stock is oversold."
         elif data['RSI'].iloc[-1] > 70:
-            recommendations.append({"Indicator": "RSI", "Action": "SELL", "Explanation": "RSI indicates overbought condition."})
+            action = "SELL"
+            explanation = "RSI indicates the stock is overbought."
         else:
-            recommendations.append({"Indicator": "RSI", "Action": "HOLD", "Explanation": "RSI is in a neutral range."})
+            action = "HOLD"
+            explanation = "RSI is in a neutral range."
+        recommendations.append({
+            "Indicator": "RSI",
+            "Action": action,
+            "Explanation": explanation,
+            "Pros": "Helps spot good entry and exit points.",
+            "Cons": "May not work well in trending markets."
+        })
 
     if not data['MACD'].isnull().iloc[-1] and not data['Signal_Line'].isnull().iloc[-1]:
-        recommendations.append({"Indicator": "MACD", "Action": "SELL" if data['MACD'].iloc[-1] <= data['Signal_Line'].iloc[-1] else "BUY", 
-                                "Explanation": "MACD indicates momentum is upward (Buy) or downward (Sell)."})
+        action = "BUY" if data['MACD'].iloc[-1] > data['Signal_Line'].iloc[-1] else "SELL"
+        recommendations.append({
+            "Indicator": "MACD",
+            "Action": action,
+            "Explanation": "MACD shows momentum is upward (Buy) or downward (Sell).",
+            "Pros": "Good for identifying trend reversals.",
+            "Cons": "May lag in volatile conditions."
+        })
 
     return recommendations
 
@@ -91,35 +116,8 @@ def plot_analysis(data, ticker):
     plt.legend()
     st.pyplot(plt)
 
-# News Retrieval and Sentiment Analysis
-def fetch_business_insider_news(query):
-    base_url = f"https://www.businessinsider.com/s?q={query}"
-    response = requests.get(base_url)
-    if response.status_code != 200:
-        st.error("Failed to fetch news articles.")
-        return None
-
-    soup = BeautifulSoup(response.content, "html.parser")
-    articles = []
-    news_items = soup.find_all("div", class_="river-item__content")
-    for item in news_items:
-        try:
-            description = item.find("p", class_="river-item__description").text.strip()
-            articles.append({"Description": description})
-        except Exception as e:
-            continue
-
-    return articles
-
-def analyze_sentiment(news_data):
-    for news in news_data:
-        analysis = TextBlob(news["Description"])
-        polarity = analysis.sentiment.polarity
-        news["Sentiment"] = "Positive" if polarity > 0 else "Negative" if polarity < 0 else "Neutral"
-    return news_data
-
 # Streamlit UI
-st.title("Technical and Sentiment Analysis App")
+st.title("Technical Analysis App")
 
 ticker = st.text_input("Enter Stock Ticker (e.g., AAPL):", "AAPL")
 start_date = st.date_input("Start Date", datetime(2022, 1, 1))
@@ -137,23 +135,3 @@ if st.button("Perform Analysis"):
         recommendations = generate_recommendations(stock_data)
         st.write("#### Recommendations and Explanations")
         st.dataframe(pd.DataFrame(recommendations))
-
-    # Sentiment Analysis
-    st.write("### Sentiment Analysis")
-    news_data = fetch_business_insider_news(ticker)
-    if news_data:
-        analyzed_news = analyze_sentiment(news_data)
-
-        # Summarize results
-        total_news = len(analyzed_news)
-        positive_news = len([news for news in analyzed_news if news["Sentiment"] == "Positive"])
-        negative_news = len([news for news in analyzed_news if news["Sentiment"] == "Negative"])
-        neutral_news = len([news for news in analyzed_news if news["Sentiment"] == "Neutral"])
-
-        st.write(f"#### News Summary")
-        st.write(f"Total news: {total_news}")
-        st.write(f"Positive news: {positive_news / total_news * 100:.2f}%")
-        st.write(f"Negative news: {negative_news / total_news * 100:.2f}%")
-        st.write(f"Neutral news: {neutral_news / total_news * 100:.2f}%")
-    else:
-        st.warning("No news found from Business Insider.")
