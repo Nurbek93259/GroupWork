@@ -1,6 +1,4 @@
-# Updating the code with simpler explanations, pros, and cons for the table
-
-simplified_code = """
+# Updating the code with simpler explanations, pros, and cons for the tablesimplified_code = """
 import streamlit as st
 import yfinance as yf
 import pandas as pd
