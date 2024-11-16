@@ -3,7 +3,6 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
-import wikipediaapi
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 
@@ -99,16 +98,23 @@ def main():
     
     # 2. Fundamental Analysis
     st.header("Fundamental Analysis")
-    st.write(f"**P/E Ratio:** {company_info['PE Ratio']}")
+    pe_ratio = company_info['PE Ratio']
+    if pe_ratio != "N/A":
+        try:
+            pe_ratio = float(pe_ratio)
+        except ValueError:
+            pass  # Leave it as is if conversion fails
+    
+    st.write(f"**P/E Ratio:** {pe_ratio}")
     st.write(f"**P/B Ratio:** {company_info['PB Ratio']}")
     st.write(f"**EPS:** {company_info['EPS']}")
     
     # Recommendations based on P/E ratio
     st.write("### Recommendation")
-    if company_info['PE Ratio'] != "N/A" and company_info['PE Ratio'] < 15:
+    if isinstance(pe_ratio, (int, float)) and pe_ratio < 15:
         recommendation = "Buy"
         description = "Undervalued"
-    elif company_info['PE Ratio'] != "N/A" and company_info['PE Ratio'] > 25:
+    elif isinstance(pe_ratio, (int, float)) and pe_ratio > 25:
         recommendation = "Sell"
         description = "Overvalued"
     else:
