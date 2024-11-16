@@ -22,6 +22,12 @@ def format_value(value):
         suffix_index += 1
     return f"${value:.1f}{suffixes[suffix_index]}"
 
+# Safe formatting for numeric values
+def safe_format(value, prefix="$", suffix=""):
+    if not isinstance(value, (int, float)):
+        return "N/A"
+    return f"{prefix}{value:.2f}{suffix}"
+
 # If Submit button is clicked
 if button:
     if not ticker.strip():
@@ -78,11 +84,6 @@ if button:
                 col1.dataframe(df, width=400, hide_index=True)
                 
                 # Display price information as a dataframe
-                def safe_format(value, prefix="$", suffix=""):
-                    if not isinstance(value, (int, float)):
-                        return "N/A"
-                    return f"{prefix}{value:.2f}{suffix}"
-
                 current_price = safe_format(info.get('currentPrice'))
                 prev_close = safe_format(info.get('previousClose'))
                 day_high = safe_format(info.get('dayHigh'))
