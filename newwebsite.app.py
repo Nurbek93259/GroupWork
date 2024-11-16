@@ -92,8 +92,8 @@ def plot_analysis(data, ticker):
     st.pyplot(plt)
 
 # News Retrieval and Sentiment Analysis
-def fetch_google_news(query):
-    base_url = f"https://news.google.com/search?q={query}&hl=en-US&gl=US&ceid=US:en"
+def fetch_business_insider_news(query):
+    base_url = f"https://www.businessinsider.com/s?q={query}"
     response = requests.get(base_url)
     if response.status_code != 200:
         st.error("Failed to fetch news articles.")
@@ -101,24 +101,19 @@ def fetch_google_news(query):
 
     soup = BeautifulSoup(response.content, "html.parser")
     articles = []
-    news_items = soup.find_all("article")
+    news_items = soup.find_all("div", class_="river-item__content")
     for item in news_items:
         try:
-            headline = item.find("a").text.strip()
-            link = "https://news.google.com" + item.find("a")["href"][1:]
-            published_time = datetime.utcnow() - timedelta(hours=1)  # Assuming the article is recent
-            articles.append({"Headline": headline, "Link": link, "PublishedAt": published_time})
+            description = item.find("p", class_="river-item__description").text.strip()
+            articles.append({"Description": description})
         except Exception as e:
             continue
 
-    # Filter news within the last 24 hours
-    current_time = datetime.utcnow()
-    recent_articles = [article for article in articles if (current_time - article["PublishedAt"]).total_seconds() <= 86400]
-    return recent_articles
+    return articles
 
 def analyze_sentiment(news_data):
     for news in news_data:
-        analysis = TextBlob(news["Headline"])
+        analysis = TextBlob(news["Description"])
         polarity = analysis.sentiment.polarity
         news["Sentiment"] = "Positive" if polarity > 0 else "Negative" if polarity < 0 else "Neutral"
     return news_data
@@ -145,7 +140,7 @@ if st.button("Perform Analysis"):
 
     # Sentiment Analysis
     st.write("### Sentiment Analysis")
-    news_data = fetch_google_news(ticker)
+    news_data = fetch_business_insider_news(ticker)
     if news_data:
         analyzed_news = analyze_sentiment(news_data)
 
@@ -156,13 +151,9 @@ if st.button("Perform Analysis"):
         neutral_news = len([news for news in analyzed_news if news["Sentiment"] == "Neutral"])
 
         st.write(f"#### News Summary")
-        st.write(f"Total news in the last 24 hours: {total_news}")
+        st.write(f"Total news: {total_news}")
         st.write(f"Positive news: {positive_news / total_news * 100:.2f}%")
         st.write(f"Negative news: {negative_news / total_news * 100:.2f}%")
         st.write(f"Neutral news: {neutral_news / total_news * 100:.2f}%")
-
-        st.write("#### Recent News Headlines")
-        for news in analyzed_news[:5]:  # Display up to 5 news articles
-            st.write(f"- [{news['Headline']}]({news['Link']}) ({news['Sentiment']})")
     else:
-        st.warning("No news found from Google News.")
+        st.warning("No news found from Business Insider.")
