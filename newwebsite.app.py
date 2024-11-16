@@ -166,8 +166,3 @@ if st.button("Perform Analysis"):
             st.write(f"- [{news['Headline']}]({news['Link']}) ({news['Sentiment']})")
     else:
         st.warning("No news found from Google News.")
-"""
-
-# Writing the corrected script to a file
-with open(google_news_script_24h_path, "w") as f:
-    f.write
