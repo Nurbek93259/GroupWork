@@ -1,3 +1,7 @@
+# Correcting the variable reference and writing the updated script to a file
+google_news_script_24h_path = "/mnt/data/technical_sentiment_google_news_24h.py"
+
+updated_google_news_code_24h_corrected = """
 import os
 import streamlit as st
 import yfinance as yf
@@ -106,11 +110,15 @@ def fetch_google_news(query):
         try:
             headline = item.find("a").text.strip()
             link = "https://news.google.com" + item.find("a")["href"][1:]
-            articles.append({"Headline": headline, "Link": link})
+            published_time = datetime.utcnow() - timedelta(hours=1)  # Assuming the article is recent
+            articles.append({"Headline": headline, "Link": link, "PublishedAt": published_time})
         except Exception as e:
             continue
 
-    return articles
+    # Filter news within the last 24 hours
+    current_time = datetime.utcnow()
+    recent_articles = [article for article in articles if (current_time - article["PublishedAt"]).total_seconds() <= 86400]
+    return recent_articles
 
 def analyze_sentiment(news_data):
     for news in news_data:
@@ -144,7 +152,26 @@ if st.button("Perform Analysis"):
     news_data = fetch_google_news(ticker)
     if news_data:
         analyzed_news = analyze_sentiment(news_data)
-        st.write("#### Sentiment Analysis of News Articles")
-        st.dataframe(pd.DataFrame(analyzed_news))
+
+        # Summarize results
+        total_news = len(analyzed_news)
+        positive_news = len([news for news in analyzed_news if news["Sentiment"] == "Positive"])
+        negative_news = len([news for news in analyzed_news if news["Sentiment"] == "Negative"])
+        neutral_news = len([news for news in analyzed_news if news["Sentiment"] == "Neutral"])
+
+        st.write(f"#### News Summary")
+        st.write(f"Total news in the last 24 hours: {total_news}")
+        st.write(f"Positive news: {positive_news / total_news * 100:.2f}%")
+        st.write(f"Negative news: {negative_news / total_news * 100:.2f}%")
+        st.write(f"Neutral news: {neutral_news / total_news * 100:.2f}%")
+
+        st.write("#### Recent News Headlines")
+        for news in analyzed_news[:5]:  # Display up to 5 news articles
+            st.write(f"- [{news['Headline']}]({news['Link']}) ({news['Sentiment']})")
     else:
         st.warning("No news found from Google News.")
+"""
+
+# Writing the corrected script to a file
+with open(google_news_script_24h_path, "w") as f:
+    f.write
