@@ -29,35 +29,92 @@ def calculate_macd(data, short_span=12, long_span=26, signal_span=9):
     data['MACD'] = data['Close'].ewm(span=short_span, adjust=False).mean() - data['Close'].ewm(span=long_span, adjust=False).mean()
     data['Signal_Line'] = data['MACD'].ewm(span=signal_span, adjust=False).mean()
 
-def generate_explanations(data):
-    explanations = []
+def generate_recommendations(data):
+    recommendations = []
 
     # SMA and EMA Crossovers
     if data['SMA_short'].iloc[-1] > data['SMA_long'].iloc[-1]:
-        explanations.append("The short-term SMA (50) is above the long-term SMA (200), indicating a BUY signal (Golden Cross).")
-    elif data['SMA_short'].iloc[-1] < data['SMA_long'].iloc[-1]:
-        explanations.append("The short-term SMA (50) is below the long-term SMA (200), indicating a SELL signal (Death Cross).")
-    
-    if data['EMA_short'].iloc[-1] > data['EMA_long'].iloc[-1]:
-        explanations.append("The short-term EMA (50) is above the long-term EMA (200), indicating a BUY signal.")
-    elif data['EMA_short'].iloc[-1] < data['EMA_long'].iloc[-1]:
-        explanations.append("The short-term EMA (50) is below the long-term EMA (200), indicating a SELL signal.")
-
-    # RSI Analysis
-    if data['RSI'].iloc[-1] < 30:
-        explanations.append("The RSI is below 30, indicating the stock is OVERSOLD. This is a BUY signal.")
-    elif data['RSI'].iloc[-1] > 70:
-        explanations.append("The RSI is above 70, indicating the stock is OVERBOUGHT. This is a SELL signal.")
+        recommendations.append({
+            "Indicator": "SMA (50 vs 200)",
+            "Action": "BUY",
+            "Explanation": "The short-term SMA (50) is above the long-term SMA (200), indicating a Golden Cross.",
+            "Pros": "Signals a strong upward trend.",
+            "Cons": "Lagging indicator; may miss early momentum."
+        })
     else:
-        explanations.append("The RSI is between 30 and 70, indicating neutral momentum. No strong buy or sell signal.")
+        recommendations.append({
+            "Indicator": "SMA (50 vs 200)",
+            "Action": "SELL",
+            "Explanation": "The short-term SMA (50) is below the long-term SMA (200), indicating a Death Cross.",
+            "Pros": "Confirms a strong downward trend.",
+            "Cons": "Lagging indicator; may react late to reversals."
+        })
 
-    # MACD Analysis
+    if data['EMA_short'].iloc[-1] > data['EMA_long'].iloc[-1]:
+        recommendations.append({
+            "Indicator": "EMA (50 vs 200)",
+            "Action": "BUY",
+            "Explanation": "The short-term EMA (50) is above the long-term EMA (200).",
+            "Pros": "Responsive to recent price changes.",
+            "Cons": "More prone to false signals during volatility."
+        })
+    else:
+        recommendations.append({
+            "Indicator": "EMA (50 vs 200)",
+            "Action": "SELL",
+            "Explanation": "The short-term EMA (50) is below the long-term EMA (200).",
+            "Pros": "Responsive to recent price changes.",
+            "Cons": "More prone to false signals during volatility."
+        })
+
+    if data['RSI'].iloc[-1] < 30:
+        recommendations.append({
+            "Indicator": "RSI",
+            "Action": "BUY",
+            "Explanation": "The RSI is below 30, indicating the stock is oversold.",
+            "Pros": "Identifies potential buying opportunities.",
+            "Cons": "May fail in strongly trending markets."
+        })
+    elif data['RSI'].iloc[-1] > 70:
+        recommendations.append({
+            "Indicator": "RSI",
+            "Action": "SELL",
+            "Explanation": "The RSI is above 70, indicating the stock is overbought.",
+            "Pros": "Identifies potential selling opportunities.",
+            "Cons": "May fail in strongly trending markets."
+        })
+    else:
+        recommendations.append({
+            "Indicator": "RSI",
+            "Action": "HOLD",
+            "Explanation": "The RSI is between 30 and 70, indicating neutral momentum.",
+            "Pros": "No immediate action needed.",
+            "Cons": "Might miss early signals."
+        })
+
     if data['MACD'].iloc[-1] > data['Signal_Line'].iloc[-1]:
-        explanations.append("The MACD line is above the signal line, indicating a BUY signal.")
-    elif data['MACD'].iloc[-1] < data['Signal_Line'].iloc[-1]:
-        explanations.append("The MACD line is below the signal line, indicating a SELL signal.")
+        recommendations.append({
+            "Indicator": "MACD",
+            "Action": "BUY",
+            "Explanation": "The MACD line is above the signal line.",
+            "Pros": "Captures momentum shifts effectively.",
+            "Cons": "Can produce false signals in choppy markets."
+        })
+    else:
+        recommendations.append({
+            "Indicator": "MACD",
+            "Action": "SELL",
+            "Explanation": "The MACD line is below the signal line.",
+            "Pros": "Captures momentum shifts effectively.",
+            "Cons": "Can produce false signals in choppy markets."
+        })
 
-    return explanations
+    return recommendations
+
+def display_recommendations_table(recommendations):
+    st.write("### Recommendations and Explanations")
+    table = pd.DataFrame(recommendations)
+    st.dataframe(table)
 
 def plot_analysis(data, ticker):
     st.write(f"### Technical Analysis for {ticker}")
@@ -106,8 +163,6 @@ if st.button("Analyze"):
         calculate_macd(stock_data)
         plot_analysis(stock_data, ticker)
 
-        # Generate and display explanations
-        explanations = generate_explanations(stock_data)
-        st.write("### Recommendations and Explanations")
-        for explanation in explanations:
-            st.write(f"- {explanation}")
+        # Generate and display recommendations
+        recommendations = generate_recommendations(stock_data)
+        display_recommendations_table(recommendations)
