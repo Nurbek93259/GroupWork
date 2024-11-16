@@ -1,3 +1,6 @@
+# Updating the code to adjust the SMA short-term and long-term averages to 50 and 200, respectively
+
+adjusted_code = """
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -12,9 +15,9 @@ def download_data(ticker, start_date, end_date):
         st.error(f"Error downloading data: {e}")
         return None
 
-def calculate_moving_averages(data, short_window=20, long_window=50):
-    data['SMA'] = data['Close'].rolling(window=short_window).mean()
-    data['LMA'] = data['Close'].rolling(window=long_window).mean()
+def calculate_moving_averages(data, short_window=50, long_window=200):
+    data['SMA_short'] = data['Close'].rolling(window=short_window).mean()
+    data['SMA_long'] = data['Close'].rolling(window=long_window).mean()
     data['EMA_short'] = data['Close'].ewm(span=short_window, adjust=False).mean()
     data['EMA_long'] = data['Close'].ewm(span=long_window, adjust=False).mean()
 
@@ -33,15 +36,15 @@ def generate_explanations(data):
     explanations = []
 
     # SMA and EMA Crossovers
-    if data['SMA'].iloc[-1] > data['LMA'].iloc[-1]:
-        explanations.append("The short-term SMA is above the long-term LMA, indicating a BUY signal (Golden Cross).")
-    elif data['SMA'].iloc[-1] < data['LMA'].iloc[-1]:
-        explanations.append("The short-term SMA is below the long-term LMA, indicating a SELL signal (Death Cross).")
+    if data['SMA_short'].iloc[-1] > data['SMA_long'].iloc[-1]:
+        explanations.append("The short-term SMA (50) is above the long-term SMA (200), indicating a BUY signal (Golden Cross).")
+    elif data['SMA_short'].iloc[-1] < data['SMA_long'].iloc[-1]:
+        explanations.append("The short-term SMA (50) is below the long-term SMA (200), indicating a SELL signal (Death Cross).")
     
     if data['EMA_short'].iloc[-1] > data['EMA_long'].iloc[-1]:
-        explanations.append("The short-term EMA is above the long-term EMA, indicating a BUY signal.")
+        explanations.append("The short-term EMA (50) is above the long-term EMA (200), indicating a BUY signal.")
     elif data['EMA_short'].iloc[-1] < data['EMA_long'].iloc[-1]:
-        explanations.append("The short-term EMA is below the long-term EMA, indicating a SELL signal.")
+        explanations.append("The short-term EMA (50) is below the long-term EMA (200), indicating a SELL signal.")
 
     # RSI Analysis
     if data['RSI'].iloc[-1] < 30:
@@ -65,10 +68,10 @@ def plot_analysis(data, ticker):
     # Plot Price and Moving Averages
     plt.figure(figsize=(12, 6))
     plt.plot(data['Close'], label='Close Price', color='blue')
-    plt.plot(data['SMA'], label='Short-term SMA (20)', color='orange')
-    plt.plot(data['LMA'], label='Long-term LMA (50)', color='green')
-    plt.plot(data['EMA_short'], label='Short-term EMA (20)', linestyle='--', color='red')
-    plt.plot(data['EMA_long'], label='Long-term EMA (50)', linestyle='--', color='purple')
+    plt.plot(data['SMA_short'], label='Short-term SMA (50)', color='orange')
+    plt.plot(data['SMA_long'], label='Long-term SMA (200)', color='green')
+    plt.plot(data['EMA_short'], label='Short-term EMA (50)', linestyle='--', color='red')
+    plt.plot(data['EMA_long'], label='Long-term EMA (200)', linestyle='--', color='purple')
     plt.title('Price Trend Analysis with Moving Averages and EMAs')
     plt.legend()
     st.pyplot(plt)
@@ -111,3 +114,12 @@ if st.button("Analyze"):
         st.write("### Recommendations and Explanations")
         for explanation in explanations:
             st.write(f"- {explanation}")
+"""
+
+# Writing the updated Python script to a file
+adjusted_script_path = "/mnt/data/technical_analysis_app_sma_50_200.py"
+with open(adjusted_script_path, "w") as f:
+    f.write(adjusted_code)
+
+# Provide the file path for the updated script
+adjusted_script_path
