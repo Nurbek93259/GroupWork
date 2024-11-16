@@ -42,30 +42,24 @@ def generate_recommendations(data):
     recommendations = []
 
     if not data['SMA_short'].isnull().iloc[-1] and not data['SMA_long'].isnull().iloc[-1]:
-        if data['SMA_short'].iloc[-1] > data['SMA_long'].iloc[-1]:
-            recommendations.append("BUY (SMA indicates upward trend)")
-        else:
-            recommendations.append("SELL (SMA indicates downward trend)")
+        recommendations.append({"Indicator": "SMA (50 vs 200)", "Action": "SELL" if data['SMA_short'].iloc[-1] <= data['SMA_long'].iloc[-1] else "BUY", 
+                                "Explanation": "Short-term average is higher than long-term (Buy) or lower (Sell)."})
 
     if not data['EMA_short'].isnull().iloc[-1] and not data['EMA_long'].isnull().iloc[-1]:
-        if data['EMA_short'].iloc[-1] > data['EMA_long'].iloc[-1]:
-            recommendations.append("BUY (EMA indicates upward trend)")
-        else:
-            recommendations.append("SELL (EMA indicates downward trend)")
+        recommendations.append({"Indicator": "EMA (50 vs 200)", "Action": "SELL" if data['EMA_short'].iloc[-1] <= data['EMA_long'].iloc[-1] else "BUY", 
+                                "Explanation": "Short-term EMA is higher than long-term (Buy) or lower (Sell)."})
 
     if not data['RSI'].isnull().iloc[-1]:
         if data['RSI'].iloc[-1] < 30:
-            recommendations.append("BUY (RSI indicates oversold)")
+            recommendations.append({"Indicator": "RSI", "Action": "BUY", "Explanation": "RSI indicates oversold condition."})
         elif data['RSI'].iloc[-1] > 70:
-            recommendations.append("SELL (RSI indicates overbought)")
+            recommendations.append({"Indicator": "RSI", "Action": "SELL", "Explanation": "RSI indicates overbought condition."})
         else:
-            recommendations.append("HOLD (RSI in normal range)")
+            recommendations.append({"Indicator": "RSI", "Action": "HOLD", "Explanation": "RSI is in a neutral range."})
 
     if not data['MACD'].isnull().iloc[-1] and not data['Signal_Line'].isnull().iloc[-1]:
-        if data['MACD'].iloc[-1] > data['Signal_Line'].iloc[-1]:
-            recommendations.append("BUY (MACD indicates upward momentum)")
-        else:
-            recommendations.append("SELL (MACD indicates downward momentum)")
+        recommendations.append({"Indicator": "MACD", "Action": "SELL" if data['MACD'].iloc[-1] <= data['Signal_Line'].iloc[-1] else "BUY", 
+                                "Explanation": "MACD indicates momentum is upward (Buy) or downward (Sell)."})
 
     return recommendations
 
@@ -97,52 +91,28 @@ def plot_analysis(data, ticker):
     plt.legend()
     st.pyplot(plt)
 
-# Sentiment Analysis Functions
-def fetch_yahoo_finance_news(ticker):
-    base_url = f"https://finance.yahoo.com/quote/{ticker}/news?p={ticker}"
-    response = requests.get(base_url)
-    if response.status_code != 200:
-        st.error("Failed to fetch news articles.")
-        return None
+# News Retrieval and Sentiment Analysis
+def fetch_bbc_cnn_news(query):
+    bbc_url = f"https://newsapi.org/v2/everything?q={query}&sources=bbc-news&apiKey=YOUR_NEWS_API_KEY"
+    cnn_url = f"https://newsapi.org/v2/everything?q={query}&sources=cnn&apiKey=YOUR_NEWS_API_KEY"
 
-    soup = BeautifulSoup(response.content, "html.parser")
-    news_items = soup.find_all("li", class_="js-stream-content")
-    news_data = []
+    bbc_response = requests.get(bbc_url)
+    cnn_response = requests.get(cnn_url)
 
-    for item in news_items:
-        try:
-            headline = item.find("h3").text.strip()
-            link = item.find("a")["href"]
-            timestamp = item.find("time")["datetime"]
-            news_data.append({
-                "Headline": headline,
-                "Link": "https://finance.yahoo.com" + link if link.startswith("/") else link,
-                "Timestamp": timestamp
-            })
-        except:
-            continue
+    articles = []
 
-    return news_data
+    if bbc_response.status_code == 200:
+        articles.extend(bbc_response.json().get("articles", []))
+    if cnn_response.status_code == 200:
+        articles.extend(cnn_response.json().get("articles", []))
 
-def filter_recent_news(news_data):
-    recent_news = []
-    current_time = datetime.utcnow()
-    for news in news_data:
-        news_time = datetime.strptime(news["Timestamp"], "%Y-%m-%dT%H:%M:%SZ")
-        if current_time - news_time <= timedelta(hours=72):
-            recent_news.append(news)
-    return recent_news
+    return [{"Headline": article["title"], "Description": article["description"], "PublishedAt": article["publishedAt"]} for article in articles]
 
 def analyze_sentiment(news_data):
     for news in news_data:
-        analysis = TextBlob(news["Headline"])
+        analysis = TextBlob(news["Headline"] if news["Headline"] else "")
         polarity = analysis.sentiment.polarity
-        if polarity > 0:
-            news["Sentiment"] = "Positive"
-        elif polarity < 0:
-            news["Sentiment"] = "Negative"
-        else:
-            news["Sentiment"] = "Neutral"
+        news["Sentiment"] = "Positive" if polarity > 0 else "Negative" if polarity < 0 else "Neutral"
     return news_data
 
 # Streamlit UI
@@ -162,20 +132,15 @@ if st.button("Perform Analysis"):
         calculate_macd(stock_data)
         plot_analysis(stock_data, ticker)
         recommendations = generate_recommendations(stock_data)
-        st.write("#### Recommendations")
-        st.write(recommendations)
+        st.write("#### Recommendations and Explanations")
+        st.dataframe(pd.DataFrame(recommendations))
 
     # Sentiment Analysis
     st.write("### Sentiment Analysis")
-    news_data = fetch_yahoo_finance_news(ticker)
+    news_data = fetch_bbc_cnn_news(ticker)
     if news_data:
-        recent_news = filter_recent_news(news_data)
-        if recent_news:
-            analyzed_news = analyze_sentiment(recent_news)
-            df = pd.DataFrame(analyzed_news)
-            st.write("#### Sentiment Analysis of Recent News")
-            st.dataframe(df[["Headline", "Timestamp", "Sentiment", "Link"]])
-        else:
-            st.warning("No recent news found.")
+        analyzed_news = analyze_sentiment(news_data)
+        st.write("#### Sentiment Analysis of News Articles")
+        st.dataframe(pd.DataFrame(analyzed_news))
     else:
-        st.error("Failed to fetch news.")
+        st.warning("No news found from BBC or CNN.")
