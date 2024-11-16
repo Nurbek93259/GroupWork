@@ -1,38 +1,59 @@
 import streamlit as st
-import requests
+import yfinance as yf
+import pandas as pd
+import matplotlib.pyplot as plt
+from datetime import datetime
 
-# Alpha Vantage API Key (Sign up at https://www.alphavantage.co/support/#api-key for a free API key)
-API_KEY = "your_api_key_here"  # Replace with your actual Alpha Vantage API key
-
-# Initial UI
-st.title("Stock Profile Viewer")
-ticker = st.text_input("Enter Ticker (e.g., NFLX):", "NFLX").upper()
-buttonClicked = st.button("Fetch Data")
-
-# Callbacks
-if buttonClicked:
-    # Construct the request URL
-    request_url = f"https://www.alphavantage.co/query?function=OVERVIEW&symbol={ticker}&apikey={API_KEY}"
-
+def download_data(ticker, start_date, end_date):
     try:
-        # Send a GET request to the Alpha Vantage API
-        response = requests.get(request_url)
-        response.raise_for_status()  # Raise HTTPError for bad responses
+        stock_data = yf.download(ticker, start=start_date, end=end_date)
+        return stock_data
+    except Exception as e:
+        st.error(f"Error downloading data: {e}")
+        return None
 
-        # Parse the JSON response
-        data = response.json()
+def calculate_moving_averages(data, short_window=20, long_window=50):
+    data['SMA'] = data['Close'].rolling(window=short_window).mean()
+    data['LMA'] = data['Close'].rolling(window=long_window).mean()
 
-        if "Symbol" in data:  # Check if valid data is returned
-            # Display the profile information
-            st.header("Profile")
-            st.metric("Symbol", data.get("Symbol", "N/A"))
-            st.metric("Sector", data.get("Sector", "N/A"))
-            st.metric("Industry", data.get("Industry", "N/A"))
-            st.metric("Market Capitalization", data.get("MarketCapitalization", "N/A"))
+def calculate_rsi(data, window=14):
+    delta = data['Close'].diff(1)
+    gain = (delta.where(delta > 0, 0)).rolling(window).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window).mean()
+    rs = gain / loss
+    data['RSI'] = 100 - (100 / (1 + rs))
 
-            with st.expander("About Company"):
-                st.write(data.get("Description", "No information available."))
-        else:
-            st.error("No data found for the given ticker. Please check the ticker symbol.")
-    except requests.exceptions.RequestException as e:
-        st.error(f"An error occurred while fetching data: {e}")
+def plot_analysis(data, ticker):
+    st.write(f"### Technical Analysis for {ticker}")
+    
+    # Plot Price and Moving Averages
+    plt.figure(figsize=(12, 6))
+    plt.plot(data['Close'], label='Close Price', color='blue')
+    plt.plot(data['SMA'], label='Short-term SMA (20)', color='orange')
+    plt.plot(data['LMA'], label='Long-term LMA (50)', color='green')
+    plt.title('Price Trend Analysis with Moving Averages')
+    plt.legend()
+    st.pyplot(plt)
+
+    # Plot RSI
+    plt.figure(figsize=(12, 4))
+    plt.plot(data['RSI'], label='RSI', color='purple')
+    plt.axhline(70, linestyle='--', color='red', label='Overbought (70)')
+    plt.axhline(30, linestyle='--', color='green', label='Oversold (30)')
+    plt.title('Momentum Indicator: RSI')
+    plt.legend()
+    st.pyplot(plt)
+
+# Streamlit UI
+st.title("Stock Technical Analysis App")
+
+ticker = st.text_input("Enter Stock Ticker (e.g., AAPL):", "AAPL")
+start_date = st.date_input("Start Date", datetime(2022, 1, 1))
+end_date = st.date_input("End Date", datetime(2023, 1, 1))
+
+if st.button("Analyze"):
+    stock_data = download_data(ticker, start_date, end_date)
+    if stock_data is not None:
+        calculate_moving_averages(stock_data)
+        calculate_rsi(stock_data)
+        plot_analysis(stock_data, ticker)
