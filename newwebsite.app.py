@@ -1,6 +1,3 @@
-# Enhancing the code to include explanations for buy/sell signals based on the analysis
-
-enhanced_code = """
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -84,12 +81,3 @@ if st.button("Analyze"):
         st.write("### Recommendations and Explanations")
         for explanation in explanations:
             st.write(f"- {explanation}")
-"""
-
-# Writing the enhanced Python script to a file
-enhanced_script_path = "/mnt/data/technical_analysis_app_with_explanations.py"
-with open(enhanced_script_path, "w") as f:
-    f.write(enhanced_code)
-
-# Provide the file path for the enhanced script
-enhanced_script_path
