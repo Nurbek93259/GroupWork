@@ -1,7 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 from datetime import datetime
 
 def download_data(ticker, start_date, end_date):
@@ -116,40 +116,35 @@ def display_recommendations_table(recommendations):
     table = pd.DataFrame(recommendations)
     st.dataframe(table)
 
-def plot_analysis(data, ticker):
-    st.write(f"### Technical Analysis for {ticker}")
+def plot_interactive_charts(data, ticker):
+    st.write(f"### Interactive Technical Analysis for {ticker}")
 
     # Plot Price and Moving Averages
-    plt.figure(figsize=(12, 6))
-    plt.plot(data['Close'], label='Close Price', color='blue')
-    plt.plot(data['SMA_short'], label='Short-term SMA (50)', color='orange')
-    plt.plot(data['SMA_long'], label='Long-term SMA (200)', color='green')
-    plt.plot(data['EMA_short'], label='Short-term EMA (50)', linestyle='--', color='red')
-    plt.plot(data['EMA_long'], label='Long-term EMA (200)', linestyle='--', color='purple')
-    plt.title('Price Trend Analysis with Moving Averages and EMAs')
-    plt.legend()
-    st.pyplot(plt)
+    fig1 = go.Figure()
+    fig1.add_trace(go.Scatter(x=data.index, y=data['Close'], mode='lines', name='Close Price'))
+    fig1.add_trace(go.Scatter(x=data.index, y=data['SMA_short'], mode='lines', name='SMA (50)'))
+    fig1.add_trace(go.Scatter(x=data.index, y=data['SMA_long'], mode='lines', name='SMA (200)'))
+    fig1.update_layout(title="Price with SMA", xaxis_title="Date", yaxis_title="Price")
+    st.plotly_chart(fig1)
 
     # Plot RSI
-    plt.figure(figsize=(12, 4))
-    plt.plot(data['RSI'], label='RSI', color='purple')
-    plt.axhline(70, linestyle='--', color='red', label='Overbought (70)')
-    plt.axhline(30, linestyle='--', color='green', label='Oversold (30)')
-    plt.title('Momentum Indicator: RSI')
-    plt.legend()
-    st.pyplot(plt)
+    fig2 = go.Figure()
+    fig2.add_trace(go.Scatter(x=data.index, y=data['RSI'], mode='lines', name='RSI'))
+    fig2.add_hline(y=70, line_dash="dash", line_color="red", annotation_text="Overbought")
+    fig2.add_hline(y=30, line_dash="dash", line_color="green", annotation_text="Oversold")
+    fig2.update_layout(title="RSI Indicator", xaxis_title="Date", yaxis_title="RSI Value")
+    st.plotly_chart(fig2)
 
     # Plot MACD
-    plt.figure(figsize=(12, 4))
-    plt.plot(data['MACD'], label='MACD Line', color='blue')
-    plt.plot(data['Signal_Line'], label='Signal Line', color='orange')
-    plt.axhline(0, linestyle='--', color='gray', label='Zero Line')
-    plt.title('Momentum Indicator: MACD')
-    plt.legend()
-    st.pyplot(plt)
+    fig3 = go.Figure()
+    fig3.add_trace(go.Scatter(x=data.index, y=data['MACD'], mode='lines', name='MACD Line'))
+    fig3.add_trace(go.Scatter(x=data.index, y=data['Signal_Line'], mode='lines', name='Signal Line'))
+    fig3.add_hline(y=0, line_dash="dash", line_color="gray", annotation_text="Zero Line")
+    fig3.update_layout(title="MACD Indicator", xaxis_title="Date", yaxis_title="MACD Value")
+    st.plotly_chart(fig3)
 
 # Streamlit UI
-st.title("Stock Technical Analysis App")
+st.title("Interactive Stock Technical Analysis App")
 
 ticker = st.text_input("Enter Stock Ticker (e.g., AAPL):", "AAPL")
 start_date = st.date_input("Start Date", datetime(2022, 1, 1))
@@ -161,7 +156,7 @@ if st.button("Analyze"):
         calculate_moving_averages(stock_data)
         calculate_rsi(stock_data)
         calculate_macd(stock_data)
-        plot_analysis(stock_data, ticker)
+        plot_interactive_charts(stock_data, ticker)
 
         # Generate and display recommendations
         recommendations = generate_recommendations(stock_data)
