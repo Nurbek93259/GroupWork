@@ -1,4 +1,3 @@
-"""
 import os
 import streamlit as st
 import yfinance as yf
@@ -183,12 +182,3 @@ try:
         f.write(simplified_script_content)
 except Exception as e:
     st.error(f"Error saving the script: {e}")
-"""
-
-# Write the fixed script to a file
-fixed_script_output_path = "/mnt/data/fixed_simplified_technical_analysis_script.py"
-with open(fixed_script_output_path, "w") as f:
-    f.write(simplified_script_content)
-
-# Return the path for the user
-fixed_script_output_path
