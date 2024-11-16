@@ -4,9 +4,9 @@ import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
+from textblob import TextBlob
 from bs4 import BeautifulSoup
 import requests
-from textblob import TextBlob
 
 # Define a valid path for saving the script
 script_dir = os.path.join(os.getcwd(), "generated_scripts")
@@ -92,25 +92,29 @@ def plot_analysis(data, ticker):
     st.pyplot(plt)
 
 # News Retrieval and Sentiment Analysis
-def fetch_bbc_cnn_news(query):
-    bbc_url = f"https://newsapi.org/v2/everything?q={query}&sources=bbc-news&apiKey=YOUR_NEWS_API_KEY"
-    cnn_url = f"https://newsapi.org/v2/everything?q={query}&sources=cnn&apiKey=YOUR_NEWS_API_KEY"
+def fetch_google_news(query):
+    base_url = f"https://news.google.com/search?q={query}&hl=en-US&gl=US&ceid=US:en"
+    response = requests.get(base_url)
+    if response.status_code != 200:
+        st.error("Failed to fetch news articles.")
+        return None
 
-    bbc_response = requests.get(bbc_url)
-    cnn_response = requests.get(cnn_url)
-
+    soup = BeautifulSoup(response.content, "html.parser")
     articles = []
+    news_items = soup.find_all("article")
+    for item in news_items:
+        try:
+            headline = item.find("a").text.strip()
+            link = "https://news.google.com" + item.find("a")["href"][1:]
+            articles.append({"Headline": headline, "Link": link})
+        except Exception as e:
+            continue
 
-    if bbc_response.status_code == 200:
-        articles.extend(bbc_response.json().get("articles", []))
-    if cnn_response.status_code == 200:
-        articles.extend(cnn_response.json().get("articles", []))
-
-    return [{"Headline": article["title"], "Description": article["description"], "PublishedAt": article["publishedAt"]} for article in articles]
+    return articles
 
 def analyze_sentiment(news_data):
     for news in news_data:
-        analysis = TextBlob(news["Headline"] if news["Headline"] else "")
+        analysis = TextBlob(news["Headline"])
         polarity = analysis.sentiment.polarity
         news["Sentiment"] = "Positive" if polarity > 0 else "Negative" if polarity < 0 else "Neutral"
     return news_data
@@ -137,10 +141,10 @@ if st.button("Perform Analysis"):
 
     # Sentiment Analysis
     st.write("### Sentiment Analysis")
-    news_data = fetch_bbc_cnn_news(ticker)
+    news_data = fetch_google_news(ticker)
     if news_data:
         analyzed_news = analyze_sentiment(news_data)
         st.write("#### Sentiment Analysis of News Articles")
         st.dataframe(pd.DataFrame(analyzed_news))
     else:
-        st.warning("No news found from BBC or CNN.")
+        st.warning("No news found from Google News.")
