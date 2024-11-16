@@ -1,3 +1,6 @@
+# Enhancing the code to include explanations for buy/sell signals based on the analysis
+
+enhanced_code = """
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -22,6 +25,24 @@ def calculate_rsi(data, window=14):
     loss = (-delta.where(delta < 0, 0)).rolling(window).mean()
     rs = gain / loss
     data['RSI'] = 100 - (100 / (1 + rs))
+
+def generate_explanations(data):
+    explanations = []
+    if data['SMA'].iloc[-1] > data['LMA'].iloc[-1]:
+        explanations.append("The short-term SMA is above the long-term LMA, indicating a BUY signal.")
+    elif data['SMA'].iloc[-1] < data['LMA'].iloc[-1]:
+        explanations.append("The short-term SMA is below the long-term LMA, indicating a SELL signal.")
+    else:
+        explanations.append("The short-term SMA is equal to the long-term LMA, indicating a HOLD signal.")
+
+    if data['RSI'].iloc[-1] < 30:
+        explanations.append("The RSI is below 30, indicating the stock is OVERSOLD. This is a BUY signal.")
+    elif data['RSI'].iloc[-1] > 70:
+        explanations.append("The RSI is above 70, indicating the stock is OVERBOUGHT. This is a SELL signal.")
+    else:
+        explanations.append("The RSI is between 30 and 70, indicating neutral momentum. No strong buy or sell signal.")
+
+    return explanations
 
 def plot_analysis(data, ticker):
     st.write(f"### Technical Analysis for {ticker}")
@@ -57,3 +78,18 @@ if st.button("Analyze"):
         calculate_moving_averages(stock_data)
         calculate_rsi(stock_data)
         plot_analysis(stock_data, ticker)
+
+        # Generate and display explanations
+        explanations = generate_explanations(stock_data)
+        st.write("### Recommendations and Explanations")
+        for explanation in explanations:
+            st.write(f"- {explanation}")
+"""
+
+# Writing the enhanced Python script to a file
+enhanced_script_path = "/mnt/data/technical_analysis_app_with_explanations.py"
+with open(enhanced_script_path, "w") as f:
+    f.write(enhanced_code)
+
+# Provide the file path for the enhanced script
+enhanced_script_path
