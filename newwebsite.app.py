@@ -167,7 +167,6 @@ if st.button("Analyze"):
         # Generate and display recommendations
         recommendations = generate_recommendations(stock_data)
         display_recommendations_table(recommendations)
-"""
 
 # Writing the updated Python script to a file
 simplified_script_path = "/mnt/data/technical_analysis_app_simplified_explanations.py"
