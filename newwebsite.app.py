@@ -4,6 +4,7 @@ import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
+import plotly.graph_objects as go
 
 # Define a valid path for saving the script
 script_dir = os.path.join(os.getcwd(), "generated_scripts")
@@ -116,22 +117,45 @@ def plot_analysis(data, ticker):
     plt.legend()
     st.pyplot(plt)
 
-# Streamlit UI
-st.title("Technical Analysis App")
+# Main App Interface
+st.title("Stock Analysis App")
+option = st.sidebar.selectbox("Choose Analysis Type:", ["Company Overview & Fundamental Analysis", "Technical Analysis"])
 
-ticker = st.text_input("Enter Stock Ticker (e.g., AAPL):", "AAPL")
-start_date = st.date_input("Start Date", datetime(2022, 1, 1))
-end_date = st.date_input("End Date", datetime(2023, 1, 1))
+ticker = st.sidebar.text_input("Enter Stock Ticker (e.g., AAPL):", "AAPL")
 
-if st.button("Perform Analysis"):
-    # Technical Analysis
+if option == "Company Overview & Fundamental Analysis":
+    stock = yf.Ticker(ticker)
+    info = stock.info
+    st.title(f"{info['longName']} ({ticker.upper()})")
+
+    with st.expander("About the Company"):
+        st.write(info.get("longBusinessSummary", "Company information is not available."))
+
+    st.write(f"**Industry:** {info.get('industry', 'N/A')}")
+    st.write(f"**Country:** {info.get('country', 'N/A')}")
+    st.markdown(f"[**Website**]({info.get('website', '')})" if info.get("website") else "**Website:** N/A", unsafe_allow_html=True)
+    
+    st.write("#### Candlestick Chart")
+    historical = stock.history(period="1y")
+    fig = go.Figure(data=[go.Candlestick(x=historical.index,
+                                         open=historical['Open'],
+                                         high=historical['High'],
+                                         low=historical['Low'],
+                                         close=historical['Close'])])
+    st.plotly_chart(fig, use_container_width=True)
+
+elif option == "Technical Analysis":
     st.write("### Technical Analysis")
-    stock_data = download_data(ticker, start_date, end_date)
-    if stock_data is not None:
-        calculate_moving_averages(stock_data)
-        calculate_rsi(stock_data)
-        calculate_macd(stock_data)
-        plot_analysis(stock_data, ticker)
-        recommendations = generate_recommendations(stock_data)
-        st.write("#### Recommendations and Explanations")
-        st.dataframe(pd.DataFrame(recommendations))
+    start_date = st.date_input("Start Date", datetime(2022, 1, 1))
+    end_date = st.date_input("End Date", datetime(2023, 1, 1))
+
+    if st.button("Perform Technical Analysis"):
+        stock_data = download_data(ticker, start_date, end_date)
+        if stock_data is not None:
+            calculate_moving_averages(stock_data)
+            calculate_rsi(stock_data)
+            calculate_macd(stock_data)
+            plot_analysis(stock_data, ticker)
+            recommendations = generate_recommendations(stock_data)
+            st.write("#### Recommendations and Explanations")
+            st.dataframe(pd.DataFrame(recommendations))
