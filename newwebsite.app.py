@@ -1,6 +1,3 @@
-# Updating the code to adjust the SMA short-term and long-term averages to 50 and 200, respectively
-
-adjusted_code = """
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -114,12 +111,3 @@ if st.button("Analyze"):
         st.write("### Recommendations and Explanations")
         for explanation in explanations:
             st.write(f"- {explanation}")
-"""
-
-# Writing the updated Python script to a file
-adjusted_script_path = "/mnt/data/technical_analysis_app_sma_50_200.py"
-with open(adjusted_script_path, "w") as f:
-    f.write(adjusted_code)
-
-# Provide the file path for the updated script
-adjusted_script_path
