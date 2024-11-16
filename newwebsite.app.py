@@ -180,5 +180,3 @@ if st.button("Analyze"):
 try:
     with open(simplified_script_path, "w") as f:
         f.write(simplified_script_content)
-except Exception as e:
-    st.error(f"Error saving the script: {e}")
