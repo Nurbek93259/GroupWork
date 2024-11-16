@@ -1,9 +1,14 @@
-# Updating the code with simpler explanations, pros, and cons for the tablesimplified_code = """
+import os
 import streamlit as st
 import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
+
+# Define a valid path for saving the script
+script_dir = os.path.join(os.getcwd(), "generated_scripts")
+os.makedirs(script_dir, exist_ok=True)  # Create the directory if it doesn't exist
+simplified_script_path = os.path.join(script_dir, "technical_analysis_app_simplified_explanations.py")
 
 def download_data(ticker, start_date, end_date):
     try:
@@ -34,81 +39,85 @@ def generate_recommendations(data):
     recommendations = []
 
     # SMA and EMA Crossovers
-    if data['SMA_short'].iloc[-1] > data['SMA_long'].iloc[-1]:
-        recommendations.append({
-            "Indicator": "SMA (50 vs 200)",
-            "Action": "BUY",
-            "Explanation": "The short-term average is higher than the long-term average. This suggests the price is going up.",
-            "Pros": "Good for seeing long-term growth trends.",
-            "Cons": "Might miss quick changes in the price."
-        })
-    else:
-        recommendations.append({
-            "Indicator": "SMA (50 vs 200)",
-            "Action": "SELL",
-            "Explanation": "The short-term average is lower than the long-term average. This suggests the price is going down.",
-            "Pros": "Good for confirming a downward trend.",
-            "Cons": "Might react slowly to sudden changes."
-        })
+    if not data['SMA_short'].isnull().iloc[-1] and not data['SMA_long'].isnull().iloc[-1]:
+        if data['SMA_short'].iloc[-1] > data['SMA_long'].iloc[-1]:
+            recommendations.append({
+                "Indicator": "SMA (50 vs 200)",
+                "Action": "BUY",
+                "Explanation": "The short-term average is higher than the long-term average. This suggests the price is going up.",
+                "Pros": "Good for seeing long-term growth trends.",
+                "Cons": "Might miss quick changes in the price."
+            })
+        else:
+            recommendations.append({
+                "Indicator": "SMA (50 vs 200)",
+                "Action": "SELL",
+                "Explanation": "The short-term average is lower than the long-term average. This suggests the price is going down.",
+                "Pros": "Good for confirming a downward trend.",
+                "Cons": "Might react slowly to sudden changes."
+            })
 
-    if data['EMA_short'].iloc[-1] > data['EMA_long'].iloc[-1]:
-        recommendations.append({
-            "Indicator": "EMA (50 vs 200)",
-            "Action": "BUY",
-            "Explanation": "The short-term EMA is higher than the long-term EMA, showing a price increase.",
-            "Pros": "Responds quickly to recent price changes.",
-            "Cons": "Might give false signals if prices jump around a lot."
-        })
-    else:
-        recommendations.append({
-            "Indicator": "EMA (50 vs 200)",
-            "Action": "SELL",
-            "Explanation": "The short-term EMA is lower than the long-term EMA, showing a price decrease.",
-            "Pros": "Responds quickly to recent price changes.",
-            "Cons": "Might give false signals if prices jump around a lot."
-        })
+    if not data['EMA_short'].isnull().iloc[-1] and not data['EMA_long'].isnull().iloc[-1]:
+        if data['EMA_short'].iloc[-1] > data['EMA_long'].iloc[-1]:
+            recommendations.append({
+                "Indicator": "EMA (50 vs 200)",
+                "Action": "BUY",
+                "Explanation": "The short-term EMA is higher than the long-term EMA, showing a price increase.",
+                "Pros": "Responds quickly to recent price changes.",
+                "Cons": "Might give false signals if prices jump around a lot."
+            })
+        else:
+            recommendations.append({
+                "Indicator": "EMA (50 vs 200)",
+                "Action": "SELL",
+                "Explanation": "The short-term EMA is lower than the long-term EMA, showing a price decrease.",
+                "Pros": "Responds quickly to recent price changes.",
+                "Cons": "Might give false signals if prices jump around a lot."
+            })
 
-    if data['RSI'].iloc[-1] < 30:
-        recommendations.append({
-            "Indicator": "RSI",
-            "Action": "BUY",
-            "Explanation": "The stock is oversold. This means it might be cheap and could go up soon.",
-            "Pros": "Helps find good times to buy.",
-            "Cons": "Might not work well if prices are falling strongly."
-        })
-    elif data['RSI'].iloc[-1] > 70:
-        recommendations.append({
-            "Indicator": "RSI",
-            "Action": "SELL",
-            "Explanation": "The stock is overbought. This means it might be expensive and could go down soon.",
-            "Pros": "Helps find good times to sell.",
-            "Cons": "Might not work well if prices are rising strongly."
-        })
-    else:
-        recommendations.append({
-            "Indicator": "RSI",
-            "Action": "HOLD",
-            "Explanation": "The stock is in a normal range. No action needed.",
-            "Pros": "You don’t need to do anything right now.",
-            "Cons": "Might miss chances to act early."
-        })
+    if not data['RSI'].isnull().iloc[-1]:
+        if data['RSI'].iloc[-1] < 30:
+            recommendations.append({
+                "Indicator": "RSI",
+                "Action": "BUY",
+                "Explanation": "The stock is oversold. This means it might be cheap and could go up soon.",
+                "Pros": "Helps find good times to buy.",
+                "Cons": "Might not work well if prices are falling strongly."
+            })
+        elif data['RSI'].iloc[-1] > 70:
+            recommendations.append({
+                "Indicator": "RSI",
+                "Action": "SELL",
+                "Explanation": "The stock is overbought. This means it might be expensive and could go down soon.",
+                "Pros": "Helps find good times to sell.",
+                "Cons": "Might not work well if prices are rising strongly."
+            })
+        else:
+            recommendations.append({
+                "Indicator": "RSI",
+                "Action": "HOLD",
+                "Explanation": "The stock is in a normal range. No action needed.",
+                "Pros": "You don’t need to do anything right now.",
+                "Cons": "Might miss chances to act early."
+            })
 
-    if data['MACD'].iloc[-1] > data['Signal_Line'].iloc[-1]:
-        recommendations.append({
-            "Indicator": "MACD",
-            "Action": "BUY",
-            "Explanation": "The MACD shows upward momentum in the stock.",
-            "Pros": "Good at spotting trends early.",
-            "Cons": "Might give wrong signals in unstable markets."
-        })
-    else:
-        recommendations.append({
-            "Indicator": "MACD",
-            "Action": "SELL",
-            "Explanation": "The MACD shows downward momentum in the stock.",
-            "Pros": "Good at spotting when prices might fall.",
-            "Cons": "Might give wrong signals in unstable markets."
-        })
+    if not data['MACD'].isnull().iloc[-1] and not data['Signal_Line'].isnull().iloc[-1]:
+        if data['MACD'].iloc[-1] > data['Signal_Line'].iloc[-1]:
+            recommendations.append({
+                "Indicator": "MACD",
+                "Action": "BUY",
+                "Explanation": "The MACD shows upward momentum in the stock.",
+                "Pros": "Good at spotting trends early.",
+                "Cons": "Might give wrong signals in unstable markets."
+            })
+        else:
+            recommendations.append({
+                "Indicator": "MACD",
+                "Action": "SELL",
+                "Explanation": "The MACD shows downward momentum in the stock.",
+                "Pros": "Good at spotting when prices might fall.",
+                "Cons": "Might give wrong signals in unstable markets."
+            })
 
     return recommendations
 
@@ -168,10 +177,8 @@ if st.button("Analyze"):
         recommendations = generate_recommendations(stock_data)
         display_recommendations_table(recommendations)
 
-# Writing the updated Python script to a file
-simplified_script_path = "/mnt/data/technical_analysis_app_simplified_explanations.py"
-with open(simplified_script_path, "w") as f:
-    f.write(simplified_code)
-
-# Provide the file path for the updated script
-simplified_script_path
+try:
+    with open(simplified_script_path, "w") as f:
+        f.write(fixed_simplified_script)
+except Exception as e:
+    st.error(f"Error saving the script: {e}")
